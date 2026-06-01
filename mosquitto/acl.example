@@ -1,0 +1,10 @@
+# Example Mosquitto ACL (copy/adapt into the add-on if enabling ACLs).
+# Restrict the zigbee2mqtt user to its own topic tree.
+
+user zigbee2mqtt
+topic readwrite zigbee2mqtt/#
+
+# Home Assistant's MQTT integration user (full access on its discovery prefix):
+user homeassistant
+topic readwrite homeassistant/#
+topic readwrite zigbee2mqtt/#

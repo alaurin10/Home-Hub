@@ -1,0 +1,4 @@
+# Automations — start UI-managed (Settings → Automations & Scenes); they
+# serialize into this file and stay git-tracked. Graduate complex ones into
+# packages/ later. See docs/00-architecture.md §6.
+[]

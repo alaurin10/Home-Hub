@@ -1,0 +1,15 @@
+# Recorder → MariaDB add-on. Short retention; long-term data goes to InfluxDB +
+# Home Assistant Long-Term Statistics. See docs/00-architecture.md §8.
+recorder:
+  db_url: !secret recorder_db_url
+  purge_keep_days: 10
+  commit_interval: 5
+  exclude:
+    domains:
+      - automation
+      - updater
+    entity_globs:
+      - sensor.*_uptime
+      - sensor.*_wifi_signal
+    entities:
+      - sun.sun

@@ -1,0 +1,39 @@
+name: esphome-validate
+
+# Cloud validation gate for ESP device configs. Schema-only (no compile) → fast.
+# The self-hosted runner compiles + OTAs at deploy time (Phase 8). See docs/00 §13.
+
+on:
+  pull_request:
+    paths: ["esphome/**"]
+  push:
+    branches: [main]
+    paths: ["esphome/**"]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install ESPHome
+        run: pip install esphome
+
+      - name: Provide dummy secrets
+        run: cp esphome/secrets.yaml.example esphome/secrets.yaml
+
+      - name: Validate every node config (schema only, no compile)
+        run: |
+          shopt -s nullglob
+          status=0
+          for f in esphome/*.yaml; do
+            [ "$(basename "$f")" = "secrets.yaml" ] && continue
+            echo "::group::esphome config $f"
+            esphome config "$f" || status=1
+            echo "::endgroup::"
+          done
+          exit $status

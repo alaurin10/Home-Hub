@@ -1,0 +1,33 @@
+# =====================================================================
+# Home-Hub .gitignore  (git root == Home Assistant /config)
+# Secrets and runtime state must NEVER reach GitHub. See docs/00 §5.
+# =====================================================================
+
+# --- Secrets & credentials ---
+secrets.yaml
+.env
+*.key
+*.pem
+.ssh/
+esphome/secrets.yaml
+
+# --- HA runtime state (backup-only, not git) ---
+.storage/
+.cloud/
+*.db
+*.db-*
+home-assistant_v2.db*
+*.log
+deps/
+tts/
+.cache/
+__pycache__/
+.HA_VERSION
+backups/
+
+# --- ESPHome build artifacts ---
+.esphome/
+*.bin
+
+# --- OS noise ---
+.DS_Store

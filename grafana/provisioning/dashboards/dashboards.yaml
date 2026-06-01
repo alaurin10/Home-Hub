@@ -1,0 +1,11 @@
+# Grafana dashboard provider — loads dashboard JSON from this directory.
+# Export your built dashboards as JSON into this folder and commit them so they
+# deploy via pull → restart Grafana (config-as-code).
+apiVersion: 1
+providers:
+  - name: home-hub
+    type: file
+    disableDeletion: false
+    allowUiUpdates: true
+    options:
+      path: /etc/grafana/provisioning/dashboards

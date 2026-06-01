@@ -1,0 +1,14 @@
+# HomeKit Bridge → Apple Home. ALLOWLIST ONLY (include_entities), never deny.
+# Watch the ~150-accessory/bridge limit. FREEZE entity unique_ids BEFORE pairing
+# (changing them later shows "No Response"/duplicates). Pairing state lives in
+# .storage → backup, not git. See docs/00-architecture.md §9.
+homekit:
+  - name: Home Hub Bridge
+    mode: bridge
+    filter:
+      include_entities:
+        # Air-quality sensors map to native Apple Home tiles (CO2 / Air Quality):
+        - sensor.office_air_co2
+        - sensor.office_air_temperature
+        - sensor.office_air_humidity
+        # Add lights / switches / climate / motion / contact as devices arrive.
