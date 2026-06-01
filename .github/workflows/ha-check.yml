@@ -34,9 +34,11 @@ jobs:
         run: cp secrets.yaml.example secrets.yaml
 
       - name: Home Assistant check_config
-        # Pin :stable to your installed HA version in Phase 1 (e.g. :2026.5)
-        # so CI validates against exactly what you run.
+        # Pinned to HA 2026.5. Update this when you upgrade HA:
+        #   Settings → System → About → note the version → change the tag below.
+        # Available tags: https://github.com/home-assistant/core/pkgs/container/home-assistant
+        # Format: YYYY.M (no leading zero on month), e.g. 2026.5, 2026.6, 2026.12
         run: |
           docker run --rm -v "${PWD}:/config" \
-            ghcr.io/home-assistant/home-assistant:stable \
+            ghcr.io/home-assistant/home-assistant:2026.5 \
             python -m homeassistant --script check_config -c /config
