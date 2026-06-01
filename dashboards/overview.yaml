@@ -1,0 +1,18 @@
+# Lovelace dashboard (YAML-mode example). Start in UI mode; when ready, set
+#   lovelace: { mode: yaml, dashboards: ... }   and register this file.
+title: Home Overview
+views:
+  - title: Overview
+    path: overview
+    cards:
+      - type: entities
+        title: Office Air
+        entities:
+          - entity: sensor.office_air_co2
+          - entity: sensor.office_air_temperature
+          - entity: sensor.office_air_humidity
+      - type: history-graph
+        title: CO2 (last 24h)
+        hours_to_show: 24
+        entities:
+          - entity: sensor.office_air_co2

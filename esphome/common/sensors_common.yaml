@@ -1,0 +1,17 @@
+# Reusable SCD4x air block (CO2 + temperature + humidity).
+# Include from an air node alongside base.yaml:
+#
+#   packages:
+#     base: !include common/base.yaml
+#     air:  !include common/sensors_common.yaml
+#
+# Requires the node to define an `i2c:` bus and a `friendly_name` substitution.
+sensor:
+  - platform: scd4x
+    co2:
+      name: "${friendly_name} CO2"
+    temperature:
+      name: "${friendly_name} Temperature"
+    humidity:
+      name: "${friendly_name} Humidity"
+    update_interval: 60s

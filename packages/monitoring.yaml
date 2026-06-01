@@ -1,0 +1,30 @@
+# Health monitoring — stale sensors, low battery, disk, UPS. See §12.
+# Template sensors here; the alerting automations live in automations.yaml (or
+# graduate into a package) so we keep a single `automation:` source.
+
+template:
+  - binary_sensor:
+      # Fires if the office air node hasn't reported in >10 minutes.
+      - name: "Office Air Stale"
+        unique_id: office_air_stale
+        device_class: problem
+        state: >
+          {% set s = states.sensor.office_air_co2 %}
+          {{ s is none or (now() - s.last_updated).total_seconds() > 600 }}
+
+# --- Example alerting automation (add to automations.yaml when ready) ---
+# - alias: "Alert: critical sensor stale"
+#   id: alert_sensor_stale
+#   trigger:
+#     - platform: state
+#       entity_id: binary_sensor.office_air_stale
+#       to: "on"
+#       for: "00:05:00"
+#   action:
+#     - service: notify.notify_group
+#       data:
+#         title: "Sensor offline"
+#         message: "Office Air has not reported in over 10 minutes."
+#
+# NVMe free-space + UPS state: add via the System Monitor and NUT integrations
+# (UI config entries) in Phase 1/7, then alert on their entities here.

@@ -1,0 +1,23 @@
+# First node: office air-quality sensor (SCD40 over I²C).
+# Hostname/entity naming per docs/01-naming-conventions.md.
+substitutions:
+  node_name: esp-office-air
+  friendly_name: Office Air
+
+esphome:
+  name: ${node_name}
+  friendly_name: ${friendly_name}
+
+esp32:
+  board: esp32dev
+  framework:
+    type: esp-idf
+
+packages:
+  base: !include common/base.yaml
+  air: !include common/sensors_common.yaml
+
+i2c:
+  sda: GPIO21
+  scl: GPIO22
+  scan: true

@@ -1,0 +1,28 @@
+# Air-quality detail view. Pairs HA-native cards with an embedded Grafana panel
+# for deep history (Grafana is embeddable into HA dashboards — see §10).
+title: Air Quality
+views:
+  - title: Air Quality
+    path: air-quality
+    cards:
+      - type: statistics-graph
+        title: CO2 — long-term statistics
+        stat_types:
+          - mean
+          - min
+          - max
+        entities:
+          - sensor.office_air_co2
+      - type: gauge
+        name: Office CO2
+        entity: sensor.office_air_co2
+        min: 400
+        max: 2000
+        severity:
+          green: 400
+          yellow: 1000
+          red: 1500
+      # Embed a Grafana panel (set the URL once Grafana is up, Phase 4):
+      # - type: iframe
+      #   url: https://grafana.<yourdomain>/d-solo/<uid>?panelId=1&kiosk
+      #   aspect_ratio: 50%

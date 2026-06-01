@@ -1,0 +1,21 @@
+# Home Assistant — core configuration (kept thin on purpose).
+# Real configuration lives in packages/ and the !include files below.
+# See docs/00-architecture.md §5–§6.
+
+default_config:
+
+homeassistant:
+  # Modular, DRY config — every file in packages/ is merged in by filename.
+  packages: !include_dir_named packages
+
+# Reverse proxy for remote dashboards (Cloudflare Tunnel / cloudflared add-on).
+# Set trusted_proxies to the cloudflared add-on's docker subnet in Phase 7.
+http:
+  use_x_forwarded_for: true
+  trusted_proxies:
+    - 172.30.33.0/24      # Supervisor add-on network (adjust in Phase 7)
+
+# UI-managed but git-tracked (edit in the UI; they serialize to these files):
+automation: !include automations.yaml
+script: !include scripts.yaml
+scene: !include scenes.yaml

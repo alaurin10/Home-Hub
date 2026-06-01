@@ -1,0 +1,8 @@
+# HA Companion push notification groups. Replace the placeholder target with your
+# real mobile_app_* service after installing the Companion app (Phase 3+).
+# Referenced by monitoring alerts as notify.notify_group.
+notify:
+  - platform: group
+    name: notify_group               # → notify.notify_group
+    services:
+      - service: mobile_app_iphone   # placeholder — rename to your device's service

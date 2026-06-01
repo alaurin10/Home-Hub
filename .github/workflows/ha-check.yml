@@ -1,0 +1,42 @@
+name: ha-check
+
+# Cloud validation gate for Home Assistant config. Validates schema with
+# check_config; does not connect to anything. See docs/00-architecture.md §13.
+
+on:
+  pull_request:
+    paths:
+      - "configuration.yaml"
+      - "packages/**"
+      - "automations.yaml"
+      - "scripts.yaml"
+      - "scenes.yaml"
+      - "dashboards/**"
+      - "secrets.yaml.example"
+  push:
+    branches: [main]
+    paths:
+      - "configuration.yaml"
+      - "packages/**"
+      - "automations.yaml"
+      - "scripts.yaml"
+      - "scenes.yaml"
+      - "dashboards/**"
+      - "secrets.yaml.example"
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Provide dummy secrets
+        run: cp secrets.yaml.example secrets.yaml
+
+      - name: Home Assistant check_config
+        # Pin :stable to your installed HA version in Phase 1 (e.g. :2026.5)
+        # so CI validates against exactly what you run.
+        run: |
+          docker run --rm -v "${PWD}:/config" \
+            ghcr.io/home-assistant/home-assistant:stable \
+            python -m homeassistant --script check_config -c /config

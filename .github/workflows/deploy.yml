@@ -1,0 +1,45 @@
+name: deploy
+
+# =====================================================================
+# Phase 8 — automatic push-to-deploy (OTA) via a SELF-HOSTED runner on
+# the LAN. SKELETON: inert until you (1) register a self-hosted runner
+# labelled `home-lan`, (2) add the deploy secrets, and (3) set the repo
+# variable DEPLOY_ENABLED=true. See docs/00-architecture.md §4.
+# =====================================================================
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Never run two deploys at once.
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    # Guard: skipped entirely until explicitly enabled in repo settings.
+    if: ${{ vars.DEPLOY_ENABLED == 'true' }}
+    runs-on: [self-hosted, home-lan]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # full history for change detection
+
+      - name: Detect changed ESPHome nodes
+        id: changes
+        run: ./scripts/deploy-esphome.sh detect
+
+      - name: Sync HA/Z2M/Grafana config + reload via HA API
+        run: ./scripts/reload-ha.sh
+        env:
+          HA_BASE_URL: ${{ secrets.HA_BASE_URL }}
+          HA_TOKEN: ${{ secrets.HA_TOKEN }}
+
+      - name: ESPHome OTA (canary → batches → health check)
+        run: ./scripts/deploy-esphome.sh deploy
+        env:
+          ESPHOME_OTA_PASSWORD: ${{ secrets.ESPHOME_OTA_PASSWORD }}
+          HA_BASE_URL: ${{ secrets.HA_BASE_URL }}
+          HA_TOKEN: ${{ secrets.HA_TOKEN }}
