@@ -36,9 +36,17 @@
 | # | Hostname | Area | Role | Sensor / HW | Example entities | Phase |
 |---|---|---|---|---|---|---|
 | 1 | `esp-office-air` | Office | air | ESP32 + SCD40 (I²C) | `sensor.office_air_co2`, `sensor.office_air_temperature`, `sensor.office_air_humidity` | 2 |
-| 2 | `esp-living-air` | Living Room | air | ESP32 + SCD40 (I²C) | `sensor.living_air_co2`, `sensor.living_air_temperature`, `sensor.living_air_humidity` | 6 |
-| 3 | `esp-bedroom-air` | Bedroom | air | ESP32 + SCD40 (I²C) | `sensor.bedroom_air_co2`, `sensor.bedroom_air_temperature`, `sensor.bedroom_air_humidity` | 6 |
+| 2 | `esp-kitchen-air` | Kitchen | air | ESP32 + **SCD41 + PMS7003 + SGP41** | `sensor.kitchen_air_co2`, `…_temperature`, `…_humidity`, `…_pm2_5`, `…_voc`, `…_nox` | 2 |
+| 3 | `esp-living-air` | Living Room | air | ESP32 + SCD41 (I²C) | `sensor.living_air_co2`, `sensor.living_air_temperature`, `sensor.living_air_humidity` | 6 |
+| 4 | `esp-bedroom-air` | Bedroom | air | ESP32 + SCD41 (I²C) | `sensor.bedroom_air_co2`, `sensor.bedroom_air_temperature`, `sensor.bedroom_air_humidity` | 6 |
 
 > Each new node = a thin `esphome/esp-<location>-<role>.yaml` that includes
-> `common/base.yaml` (+ a sensor block from `common/sensors_common.yaml`) and sets
-> `node_name` / `friendly_name`. Append rows here in the PR that adds the device.
+> `common/base.yaml` (+ a sensor block) and sets `node_name` / `friendly_name`.
+> Append rows here in the PR that adds the device.
+>
+> **Sensor-module design (air-quality session, NOT yet built):** the
+> SCD41-only nodes (living, bedroom) reuse `common/sensors_common.yaml`
+> unchanged. The **kitchen full node still needs a NEW module** —
+> `common/sensors_air_full.yaml` (a `sgp4x` block + a `pmsx003` block,
+> `type: PMS7003`) plus a `uart:` bus on the node for the PMS7003. See
+> `docs/00-architecture.md` §17 for the full design checklist.

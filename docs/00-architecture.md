@@ -484,9 +484,13 @@ changes"; **back up (and snapshot) before any update.**
   `git push` works; recorder on MariaDB; clock correct; snapshot + backup exist.
 - **Phase 2 — ESPHome base + first air node:** ESPHome add-on; `common/base.yaml`
   (wifi `!secret`, encrypted `api:`, `ota:`, `time: homeassistant`, status/uptime/
-  wifi sensors); `esp-office-air.yaml` (SCD40/SEN5x via I²C); flash USB once then
-  OTA; adopt, assign **Office** area, name per §7; stale-sensor stub. **DoD:**
-  `sensor.office_air_co2` live; connection sensor "connected"; **OTA works**; CI green.
+  wifi sensors); air node config (SCD41 via I²C); flash USB once then
+  OTA; adopt, assign area, name per §7; stale-sensor stub. **DoD:**
+  `sensor.<room>_air_co2` live; connection sensor "connected"; **OTA works**; CI green.
+  *Note (air-quality session):* the kitchen full node additionally needs the
+  **new `sensors_air_full.yaml` design (sgp4x + pmsx003/PMS7003 on a `uart:` bus)** —
+  see §17. The SCD41-only bedroom/living nodes (orig. Phase 6) reuse the existing
+  `sensors_common.yaml` and can be built alongside the kitchen.
 - **Phase 3 — Apple Home:** `packages/homekit.yaml` w/ explicit tiny
   `include_entities`; confirm HomePod is Home Hub; **freeze unique_ids first**;
   pair bridge; assign rooms. **DoD:** AQ/CO2 accessory in Apple Home; test toggle
@@ -563,8 +567,15 @@ changes"; **back up (and snapshot) before any update.**
 
 ## 17. Open items to confirm during implementation (minor; have recommendations)
 
-- **Air sensor model:** SCD40 (true CO2, cheap) vs SEN5x (PM+VOC+NOx+RH+T, richer).
-  *Rec:* SCD40 first if CO2 is the priority; SEN5x if you want particulates/VOC out of the gate.
+- **Air sensor model — RESOLVED (air-quality planning session):** tiered, all SCD41-based.
+  - **Kitchen (`esp-kitchen-air`) — full:** SCD41 (CO2/T/RH) + PMS7003 (PM1/2.5/10, UART) + SGP41 (VOC+NOx, I²C).
+  - **Bedroom + Living — reduced:** SCD41 only.
+  - Chose discrete PMS7003 + SGP41 over the all-in-one SEN5x (~$40–50) for the same metrics at lower cost. BOM: `docs/03-bill-of-materials.md`.
+  - **DESIGN WORK STILL REQUIRED — not yet built.** The shipped design only covers the SCD4x node (`common/sensors_common.yaml`, `esp-office-air.yaml`). The new sensors need their own design before flashing:
+    - NEW reusable module `esphome/common/sensors_air_full.yaml` = a `sgp4x` block (VOC+NOx index) + a `pmsx003` block (`type: PMS7003`, PM1/2.5/10). Keep `sensors_common.yaml` as the SCD41-only block.
+    - `esp-kitchen-air.yaml` (new) includes both modules and adds a `uart:` bus (e.g. GPIO16/17) alongside `i2c:` (SCD41 `0x62` + SGP41 `0x59`, no conflict; PMS7003 on UART).
+    - `esp-bedroom-air.yaml` / `esp-living-air.yaml` (new) reuse `sensors_common.yaml` (SCD41) unchanged.
+    - Extend `packages/influxdb.yaml` + `packages/homekit.yaml` allowlists and `dashboards/air-quality.yaml` for the new PM2.5 / VOC / NOx entities. See the device registry in `docs/01-naming-conventions.md`.
 - **HA OS VM creation method:** community Proxmox helper-script vs official VM image. *Rec:* whichever is current/most-maintained at build time.
 - **Off-site backup target:** Google Drive add-on (rec) vs NAS/B2.
 - **Zigbee channel** selection vs your WiFi channels (decide before mass pairing).
