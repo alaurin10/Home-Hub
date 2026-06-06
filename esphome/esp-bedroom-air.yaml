@@ -1,0 +1,23 @@
+# Bedroom air node: SCD41 (CO2 + temperature + humidity) over I²C.
+# Naming per docs/01-naming-conventions.md.
+substitutions:
+  node_name: esp-bedroom-air
+  friendly_name: Bedroom Air
+
+esphome:
+  name: ${node_name}
+  friendly_name: ${friendly_name}
+
+esp32:
+  board: esp32dev
+  framework:
+    type: esp-idf
+
+packages:
+  base: !include common/base.yaml
+  air:  !include common/sensors_common.yaml
+
+i2c:
+  sda: GPIO21
+  scl: GPIO22
+  scan: true

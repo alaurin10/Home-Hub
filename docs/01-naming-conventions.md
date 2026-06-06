@@ -44,9 +44,11 @@
 > `common/base.yaml` (+ a sensor block) and sets `node_name` / `friendly_name`.
 > Append rows here in the PR that adds the device.
 >
-> **Sensor-module design (air-quality session, NOT yet built):** the
-> SCD41-only nodes (living, bedroom) reuse `common/sensors_common.yaml`
-> unchanged. The **kitchen full node still needs a NEW module** —
-> `common/sensors_air_full.yaml` (a `sgp4x` block + a `pmsx003` block,
-> `type: PMS7003`) plus a `uart:` bus on the node for the PMS7003. See
-> `docs/00-architecture.md` §17 for the full design checklist.
+> **Sensor-module design (air-quality session) — BUILT:** the SCD41-only nodes
+> (`esp-living-air`, `esp-bedroom-air`) reuse `common/sensors_common.yaml`
+> (SCD4x). The kitchen full node adds `common/sensors_air_full.yaml` (an `sgp4x`
+> VOC/NOx block + a `pmsx003` PM block, `type: PMSX003` — the generic type that
+> covers the PMS7003) plus a `uart:` bus on `esp-kitchen-air.yaml` for the
+> PMS7003. SGP41 is humidity-compensated from the SCD41 (`scd4x_temperature` /
+> `scd4x_humidity` ids). InfluxDB + HomeKit allowlists and the air-quality
+> dashboard are extended for the PM2.5 / VOC / NOx entities.
