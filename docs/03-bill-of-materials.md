@@ -14,20 +14,40 @@ See `docs/02-bootstrap-proxmox-haos.md` §A for detailed purchasing notes and so
 
 **Phase 1 total: ~$214–244**
 
-## Phase 2 — first ESP32 sensor
+## Phase 2 / 6 — air-quality sensor nodes (3 rooms)
 
-| Item | Best price | Source | Notes |
-|---|---|---|---|
-| **SCD40 CO2 sensor bare module** | ~$14–15 | **AliExpress** (order early, 3–4 wk) | 65% cheaper than Adafruit; search "SCD40 breakout" |
-| Alt: Adafruit SCD-40 #5187 | ~$44.95 | adafruit.com | STEMMA QT; often out of stock |
-| Alt: Seeed Grove SCD41 | ~$25–30 | seeedstudio.com | SCD41 slightly more accurate; Grove connector |
-| ESP32 WROOM-32 38-pin dev board × 2 | ~$13–15 (5-pack) | Amazon DORHEA B08MQ647ZG | ~$3/board; buy 5, use 2, keep 3 as spares |
-| ESP32-C6 DevKitC-1-N8 × 1–2 | ~$10–12 | Amazon B0BRMSDR4R or DigiKey (~$8) | Optional Thread hedge |
-| Breadboard 830-tie + jumper wires kit | ~$10–13 | Amazon Smraza B01HRR7EBG | M-M, M-F, F-F wires included |
-| USB-C cable × 3 | ~$3–6 | Amazon | 5 V power for ESP32 boards; standard cables |
-| USB 5V 2–3A charger × 2 | ~$12–18 (3-pack) | Amazon | Phone chargers work too |
+Decided in the air-quality planning session: **3 ESP32 nodes ordered together**
+to get ahead on long-lead AliExpress parts. Tiered coverage for a small
+apartment — full air quality in the kitchen (cooking smoke/VOC), CO2 + climate
+in the bedroom and living room.
 
-**Phase 2 total: ~$63–119 (AliExpress SCD40) or ~$93–149 (Adafruit)**
+- **Kitchen (`esp-kitchen-air`) — full:** SCD41 + PMS7003 + SGP41
+- **Bedroom (`esp-bedroom-air`) — reduced:** SCD41 only
+- **Living (`esp-living-air`) — reduced:** SCD41 only
+
+Sensor metrics: SCD41 = true CO2 + temp + humidity; PMS7003 = PM1/2.5/10;
+SGP41 = VOC index + NOx index. The cheap PMS7003 + SGP41 pair replaces the
+all-in-one SEN55 (~$40–50) for the same metrics (T/RH comes from the SCD41).
+SCD4x = I²C `0x62`, SGP4x = I²C `0x59` (no conflict); PMS7003 is UART.
+
+| Item | Qty | Best price | Source | Notes |
+|---|---|---|---|---|
+| **SCD41 CO2/temp/humidity bare module** | 3 | ~$14–16 ea | **AliExpress** (order early, 3–4 wk) | One per node; search "SCD41 breakout". SCD41 > SCD40 (slightly more accurate). |
+| **PMS7003 laser PM sensor** (PM1/2.5/10, UART) | 1 | ~$15–19 | **AliExpress** (long lead) | Kitchen only; slim form factor, ships with ribbon cable. |
+| **SGP41 VOC+NOx module** (I²C) | 1 | ~$6–10 | **AliExpress** (long lead) | Kitchen only; VOC index + NOx index. SGP40 ~$5 if VOC-only ever acceptable. |
+| ESP32 WROOM-32 38-pin dev board | 5-pack | ~$12–15 | Amazon DORHEA B08MQ647ZG | ~$3/board; use 3, keep 2 spares. (PSoC 6 rejected — no ESPHome target.) |
+| Breadboard 830-tie + jumper wires kit | 1 | ~$10–13 | Amazon Smraza B01HRR7EBG | Bench bring-up before final assembly; M-M/M-F/F-F wires. |
+| USB-C cable × 3 | 3 | ~$3–6 | Amazon | 5 V power for ESP32 boards. |
+| USB 5V 2–3A charger | 3 | ~$9–12 (3-pack) | Amazon | **5 V matters** — kitchen PMS7003 fan runs off the board's 5 V/VIN rail. Phone chargers work. |
+| Vented ABS project box (pre-made) | 3 | ~$2–5 ea | **AliExpress** | No printer needed; ensure airflow over the kitchen PM inlet. |
+
+**Phase 2/6 air-node total: ~$97–134** (≈$80 reusing chargers/breadboard you own).
+Kitchen gas/PM is ~$21–29 (PMS7003 + SGP41) vs ~$40–50 for a SEN55.
+
+> Note: this consolidates what the architecture roadmap split across Phase 2
+> (first node) and Phase 6 (living + bedroom) — all three air nodes are bought
+> in one order. Office (`esp-office-air`) is unchanged in the registry and not
+> part of this purchase.
 
 ## Phase 5 — Zigbee coordinator + first bulb
 
@@ -67,5 +87,5 @@ ESPHome, Advanced SSH, Studio Code Server, NUT, Z2M.
 | Scope | Total |
 |---|---|
 | Phase 1 only (minimum) | ~$214–244 |
-| Phase 1 + 2 (first sensor, AliExpress SCD40) | ~$277–363 |
-| Full build through Phase 5 | ~$311–429 |
+| Phase 1 + all 3 air nodes (kitchen full + bedroom/living SCD41) | ~$311–378 |
+| Full build through Phase 5 (incl. Zigbee) | ~$345–444 |
