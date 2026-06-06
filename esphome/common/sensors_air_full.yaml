@@ -1,0 +1,39 @@
+# Extra air-quality sensors for a FULL node (kitchen): SGP41 VOC+NOx (I²C @ 0x59)
+# and PMS7003 particulate matter (UART). Include ALONGSIDE sensors_common.yaml
+# (SCD41), which provides the temperature/humidity used for SGP41 compensation:
+#
+#   packages:
+#     base: !include common/base.yaml
+#     air:  !include common/sensors_common.yaml      # SCD41 (provides T/RH ids)
+#     aqx:  !include common/sensors_air_full.yaml     # SGP41 + PMS7003
+#
+# The node MUST define BOTH:
+#   - an `i2c:` bus (SCD41 @ 0x62 + SGP41 @ 0x59 share it; no address conflict)
+#   - a `uart:` bus @ 9600 baud (PMS7003)
+# Entity names are short; HA prepends the device friendly_name →
+# "Kitchen Air PM2.5" / entity_id sensor.kitchen_air_pm2_5.
+sensor:
+  # SGP41 — VOC index + NOx index (gas/odor + combustion). Humidity-compensated
+  # from the SCD41 for accurate index output. store_baseline keeps the learned
+  # baseline across reboots (avoids a multi-hour re-learn each restart).
+  - platform: sgp4x
+    voc:
+      name: "VOC"
+    nox:
+      name: "NOx"
+    compensation:
+      temperature_source: scd4x_temperature
+      humidity_source: scd4x_humidity
+    store_baseline: true
+    update_interval: 60s
+
+  # PMS7003 — laser particulate matter (PM1.0 / PM2.5 / PM10) over UART.
+  # ESPHome covers the PMS7003 with the generic `PMSX003` type (same protocol).
+  - platform: pmsx003
+    type: PMSX003
+    pm_1_0:
+      name: "PM1.0"
+    pm_2_5:
+      name: "PM2.5"
+    pm_10_0:
+      name: "PM10"

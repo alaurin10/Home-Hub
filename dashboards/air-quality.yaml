@@ -1,10 +1,13 @@
 # Air-quality detail view. Pairs HA-native cards with an embedded Grafana panel
 # for deep history (Grafana is embeddable into HA dashboards — see §10).
+# Entities populate as each node is flashed (office=SCD40; kitchen=full;
+# bedroom/living=SCD41). Per docs/01-naming-conventions.md.
 title: Air Quality
 views:
   - title: Air Quality
     path: air-quality
     cards:
+      # --- CO2 across all rooms (long-term statistics) ---
       - type: statistics-graph
         title: CO2 — long-term statistics
         stat_types:
@@ -13,15 +16,91 @@ views:
           - max
         entities:
           - sensor.office_air_co2
-      - type: gauge
-        name: Office CO2
-        entity: sensor.office_air_co2
-        min: 400
-        max: 2000
-        severity:
-          green: 400
-          yellow: 1000
-          red: 1500
+          - sensor.kitchen_air_co2
+          - sensor.bedroom_air_co2
+          - sensor.living_air_co2
+
+      # --- CO2 gauges per room ---
+      - type: horizontal-stack
+        cards:
+          - type: gauge
+            name: Office CO2
+            entity: sensor.office_air_co2
+            min: 400
+            max: 2000
+            severity:
+              green: 400
+              yellow: 1000
+              red: 1500
+          - type: gauge
+            name: Kitchen CO2
+            entity: sensor.kitchen_air_co2
+            min: 400
+            max: 2000
+            severity:
+              green: 400
+              yellow: 1000
+              red: 1500
+          - type: gauge
+            name: Bedroom CO2
+            entity: sensor.bedroom_air_co2
+            min: 400
+            max: 2000
+            severity:
+              green: 400
+              yellow: 1000
+              red: 1500
+          - type: gauge
+            name: Living CO2
+            entity: sensor.living_air_co2
+            min: 400
+            max: 2000
+            severity:
+              green: 400
+              yellow: 1000
+              red: 1500
+
+      # --- Kitchen full air-quality (PM / VOC / NOx) ---
+      - type: horizontal-stack
+        cards:
+          - type: gauge
+            name: Kitchen PM2.5
+            entity: sensor.kitchen_air_pm2_5
+            unit: µg/m³
+            min: 0
+            max: 100
+            severity:
+              green: 0
+              yellow: 35
+              red: 55
+          - type: gauge
+            name: Kitchen VOC
+            entity: sensor.kitchen_air_voc
+            min: 0
+            max: 500
+            severity:
+              green: 0
+              yellow: 150
+              red: 300
+          - type: gauge
+            name: Kitchen NOx
+            entity: sensor.kitchen_air_nox
+            min: 0
+            max: 500
+            severity:
+              green: 0
+              yellow: 150
+              red: 300
+
+      # --- Kitchen particulate matter history ---
+      - type: history-graph
+        title: Kitchen particulate matter
+        hours_to_show: 24
+        entities:
+          - sensor.kitchen_air_pm1_0
+          - sensor.kitchen_air_pm2_5
+          - sensor.kitchen_air_pm10
+
       # Embed a Grafana panel (set the URL once Grafana is up, Phase 4):
       # - type: iframe
       #   url: https://grafana.<yourdomain>/d-solo/<uid>?panelId=1&kiosk

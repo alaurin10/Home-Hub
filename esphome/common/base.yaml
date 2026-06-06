@@ -31,21 +31,23 @@ time:
     id: homeassistant_time
 
 # Diagnostics every node reports (kept out of InfluxDB; recorder-excluded).
+# Entity names are short; the device-level `friendly_name` (set per node) is
+# prepended by HA → e.g. "Office Air Uptime" / entity_id sensor.office_air_uptime.
 sensor:
   - platform: uptime
-    name: "${friendly_name} Uptime"
+    name: "Uptime"
     update_interval: 60s
   - platform: wifi_signal
-    name: "${friendly_name} WiFi Signal"
+    name: "WiFi Signal"
     update_interval: 60s
 
 binary_sensor:
   - platform: status
-    name: "${friendly_name} Status"
+    name: "Status"
 
 text_sensor:
   - platform: version
-    name: "${friendly_name} ESPHome Version"
+    name: "ESPHome Version"
   - platform: wifi_info
     ip_address:
-      name: "${friendly_name} IP Address"
+      name: "IP Address"
