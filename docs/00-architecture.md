@@ -225,6 +225,22 @@ credentials sit on an always-on LAN runner.
   (documented in `docs/05-runbook-recovery.md`).
 - **Only config + firmware auto-deploy;** HA Core / add-on **version upgrades stay
   manual** (snapshot/backup first).
+
+**Hardening checklist — complete BEFORE flipping `DEPLOY_ENABLED` (Phase 8).**
+The shipped `deploy.yml` / `scripts/deploy-esphome.sh` are skeletons; these are
+their known sharp edges (2026-06 audit, `docs/08-audit-2026-06.md`):
+- [ ] Implement real **health-check polling** (poll the HA API until the node's
+      status sensor is back; hard timeout = fail) — currently a TODO stub.
+- [ ] **Per-node failure tracking** in the batch OTA loop — a failure mid-batch
+      must stop the rollout, not let later nodes flash blind.
+- [ ] **Automated rollback**: wire `git revert` + redeploy of last-good state
+      into the pipeline (today it's documentation only).
+- [ ] **Deploy-failure notification** (HA Companion push or GitHub notification)
+      — the "fails + pushes a notification" rail below is not yet implemented.
+- [ ] Real **secret injection** on the runner (copy from its secure store) —
+      currently a TODO stub in `reload-ha.sh` / `deploy-esphome.sh`.
+- [ ] **Branch protection on `main`** (require the validate checks) so a direct
+      push can't trigger a deploy of unvalidated config — see `docs/07-github-setup.md`.
 - Easiest safe UX: branch → PR (validates) → merge to `main` → deploy. Prefer
   pushing straight to `main`? `deploy.yml` still `needs:` validate, so a bad push
   validates-then-skips and alerts.
@@ -272,9 +288,13 @@ separate `esphome/secrets.yaml.example` (ESPHome has its own secrets file).
 home-hub/                          # == HA OS /config (git root)
 ├── README.md
 ├── .gitignore
+├── .ha-version  .esphome-version  # single-source CI version pins (§13)
+├── .yamllint.yml                  # lint rules for lint.yml
 ├── .github/workflows/
-│   ├── esphome-validate.yml   # cloud validation gate
-│   ├── ha-check.yml           # cloud validation gate
+│   ├── esphome-validate.yml   # cloud validation gate (pinned ESPHome)
+│   ├── ha-check.yml           # cloud validation gate (pinned HA)
+│   ├── lint.yml               # yamllint + gitleaks secret scan
+│   ├── upgrade-canary.yml     # weekly check vs latest HA/ESPHome
 │   └── deploy.yml             # self-hosted LAN runner: OTA deploy on push to main
 ├── scripts/
 │   ├── deploy-esphome.sh      # change-detect + canary + batched OTA + health check
@@ -285,7 +305,8 @@ home-hub/                          # == HA OS /config (git root)
 │   ├── recorder.yaml              # MariaDB recorder + retention + excludes
 │   ├── influxdb.yaml              # influxdb integration + include allowlist
 │   ├── homekit.yaml               # HomeKit bridge + include_entities allowlist
-│   ├── monitoring.yaml            # stale-sensor / battery / disk / UPS alerts
+│   ├── monitoring.yaml            # fleet stale/disconnect detection + alerts
+│   ├── comfort.yaml               # derived dew point + absolute humidity
 │   └── notifications.yaml         # companion-app notify groups
 ├── automations.yaml  scripts.yaml  scenes.yaml
 ├── dashboards/{overview.yaml,air-quality.yaml}
@@ -302,7 +323,8 @@ home-hub/                          # == HA OS /config (git root)
     ├── 00-architecture.md (this doc)   01-naming-conventions.md
     ├── 02-bootstrap-proxmox-haos.md    03-bill-of-materials.md
     ├── 04-runbook-backups.md           05-runbook-recovery.md
-    └── 06-verification.md
+    ├── 06-verification.md              07-github-setup.md
+    └── 08-audit-2026-06.md
 ```
 No `docker-compose.yml` (Supervisor manages services inside the VM). `packages/`
 keeps HA config DRY. Start with GUI-managed `automations.yaml`; graduate complex
@@ -341,6 +363,14 @@ ones into packages later.
 
 - **Never forward everything to InfluxDB** — use the `include:` allowlist or it
   bloats. Recorder `exclude` is independent of Influx forwarding.
+- **Allowlists stay explicit (per-entity), not globs** — a glob like
+  `sensor.*_air_*` would silently sweep in the per-node diagnostics
+  (`*_air_uptime`, `*_air_wifi_signal` from `common/base.yaml`), which is
+  exactly the bloat the allowlist exists to prevent. Accepted cost: every new
+  node adds a few lines to `packages/influxdb.yaml` + `packages/homekit.yaml`
+  in the same PR (the device registry in `docs/01-naming-conventions.md` lists
+  the expected entities). Revisit (e.g. a CI drift check) if this becomes
+  painful past ~20 nodes.
 - LTS covers "last year of CO2" for free; Grafana/Influx for rich, annotated,
   cross-metric dashboards.
 - Influx: org + bucket + **read-only token for Grafana** + write token for HA.
@@ -443,9 +473,15 @@ rclone→NAS/B2. **Encrypt backups** (they hold secrets + the Zigbee network key
 **Power:** **UPS** + **NUT add-on** for graceful shutdown (protects MariaDB/Influx
 from corruption on unclean power loss).
 
-**Monitoring (`packages/monitoring.yaml`):** stale-sensor alert (notify if a
-critical sensor's `last_updated` exceeds N min), low-battery (Zigbee), **NVMe
-free-space**, UPS state — via HA Companion push.
+**Monitoring (`packages/monitoring.yaml`):** fleet-wide stale/disconnect
+detection (`sensor.stale_air_nodes` + `binary_sensor.air_fleet_problem` — one
+node list drives both; adding a node = adding one name), low-battery (Zigbee),
+**NVMe free-space**, UPS state — via HA Companion push.
+
+**Watch the watcher:** every alert above flows through HA — if HA itself is
+down, nothing fires. Phase 7 adds an **external dead-man's switch**: a
+Healthchecks.io ping automation, or an **Uptime Kuma LXC on the Proxmox host**
+(fits the "few extras as LXCs" design) probing HA from outside the VM.
 
 **Updates:** HA Core / HA OS / add-ons update independently and are not atomic.
 **Don't auto-update Core**; update ~monthly after skimming "backward-incompatible
@@ -455,13 +491,23 @@ changes"; **back up (and snapshot) before any update.**
 
 ## 13. CI / validation (GitHub Actions, lightweight, PR-triggered, path-filtered)
 
-- **`esphome-validate.yml`:** `pip install esphome` → `esphome config esphome/*.yaml`.
-  Copy `esphome/secrets.yaml.example` → `secrets.yaml` in the workflow (dummy
-  values). `config` validates schema without compiling (fast).
+- **`esphome-validate.yml`:** `pip install esphome==$(cat .esphome-version)` →
+  `esphome config esphome/*.yaml`. Copy `esphome/secrets.yaml.example` →
+  `secrets.yaml` in the workflow (dummy values). `config` validates schema
+  without compiling (fast).
 - **`ha-check.yml`:** `python -m homeassistant --script check_config -c .` in the
-  official HA Docker image (or `frenck/action-home-assistant`), **pinned to your
-  HA version**; same secrets-from-example trick; fail only on config errors.
-- These two are the **validation gate** for the auto-deploy pipeline (§4): the
+  official HA Docker image, **pinned via the `.ha-version` file**; same
+  secrets-from-example trick; fail only on config errors.
+- **Version pins are single-sourced** in `.ha-version` / `.esphome-version` at
+  the repo root — when you upgrade HA or the ESPHome add-on, edit the file (the
+  workflows read it), keeping CI validating what production actually runs.
+- **`lint.yml`:** `yamllint` (config in `.yamllint.yml`) + **gitleaks** secret
+  scan over full history on every PR/push — catches a token pasted into a
+  *tracked* file, the failure mode `.gitignore` can't.
+- **`upgrade-canary.yml`:** weekly scheduled run of both checks against the
+  **latest** HA image / ESPHome release (ignoring the pins). A red run = an
+  upcoming upgrade will break config — fix *before* upgrading. Never blocks PRs.
+- The validate pair is the **gate** for the auto-deploy pipeline (§4): the
   cloud validates fast; the self-hosted LAN runner compiles + OTAs only on success.
   Heavy ESPHome compiles happen at deploy time on the runner (cached), not here.
 - Keep minimal: no compile-on-every-PR, no version matrix.
@@ -591,3 +637,40 @@ changes"; **back up (and snapshot) before any update.**
   with Access or rely on Grafana's own login.
 - **Companion-app remote path:** via Tailscale (*rec*) vs a Cloudflare Access service
   token (advanced).
+
+---
+
+## 18. Future features — backlog (post-Phase 8, prioritized)
+
+From the 2026-06 audit (`docs/08-audit-2026-06.md`). The naming registry
+(§7) already reserves the roles these need (`presence`, `power`, `leak`,
+`motion`) — adding them means new hardware + a registry entry, no renames.
+Rough order of value:
+
+1. **mmWave presence nodes** (`esp-<room>-presence`, LD2410/LD2450 + ESP32,
+   ~$8/node) — true occupancy (PIR fails on "sitting still at a desk");
+   unlocks the genuinely useful automations: lights/climate follow occupancy,
+   "office occupied + CO2 high → ventilate" nudges. Fits the existing ESPHome
+   DRY pattern (`common/base.yaml`) unchanged.
+2. **Energy monitoring** (`power` role) — start with 2–3 Zigbee **metering
+   plugs** (per-appliance, pairs with the Phase 5 mesh); later a CT-clamp
+   node (e.g. Emporia Vue 2 reflashed to ESPHome) for whole-home. Feeds HA's
+   built-in Energy dashboard for free; InfluxDB + Grafana is the showcase
+   for this data.
+3. **Air-quality-driven actuation** — close the loop on the existing sensors:
+   kitchen PM2.5 spike → metering plug switches the air purifier on / push
+   "run the range hood"; bedroom CO2 high before sleep → notify. One Zigbee
+   plug + two automations; highest payoff-per-line-of-YAML in the backlog.
+4. **Local voice — HA Assist / Voice PE** (~$59) — fully local
+   Whisper + Piper pipeline. Strongest local-first complement to Siri: Siri
+   only sees the HomeKit allowlist (§9); Assist sees everything in HA.
+5. **Leak sensors** (`leak` role, Zigbee, ~$15–20 ea: washer/sink/water
+   heater) — boring, highest ROI-per-dollar in home automation; the notify
+   group (`packages/notifications.yaml`) is already waiting.
+6. **Wall-tablet kiosk dashboard** — dedicated Lovelace view (§10 already
+   plans the tablet); the feature that gets non-technical household members
+   using the system.
+7. ~~**Derived comfort metrics** (dew point, absolute humidity)~~ — **done**,
+   `packages/comfort.yaml` (config-only, no hardware).
+8. **External dead-man's switch for HA itself** (§12 "watch the watcher") —
+   schedule with Phase 7 hardening.

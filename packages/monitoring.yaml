@@ -1,30 +1,67 @@
 # Health monitoring — stale sensors, low battery, disk, UPS. See §12.
 # Template sensors here; the alerting automations live in automations.yaml (or
 # graduate into a package) so we keep a single `automation:` source.
+#
+# Fleet-scalable pattern: ONE list of air-node locations drives both sensors
+# below. Adding a node = adding its location to `nodes` in each template.
+# Every node also exposes binary_sensor.<location>_air_status (ESPHome status
+# platform via esphome/common/base.yaml) — used for API-connectivity checks.
 
 template:
+  - sensor:
+      # Comma-separated list of air nodes whose CO2 reading is >10 min old
+      # (or missing entirely). Empty string = whole fleet fresh.
+      # `now()` makes HA re-evaluate this template every minute.
+      - name: "Stale Air Nodes"
+        unique_id: stale_air_nodes
+        icon: mdi:wifi-strength-alert-outline
+        state: >
+          {% set nodes = ['office', 'kitchen', 'bedroom', 'living'] %}
+          {% set ns = namespace(stale=[]) %}
+          {% for n in nodes %}
+            {% set s = states.sensor[n ~ '_air_co2'] %}
+            {% if s is none or (now() - s.last_updated).total_seconds() > 600 %}
+              {% set ns.stale = ns.stale + [n] %}
+            {% endif %}
+          {% endfor %}
+          {{ ns.stale | join(', ') }}
+
   - binary_sensor:
-      # Fires if the office air node hasn't reported in >10 minutes.
-      - name: "Office Air Stale"
-        unique_id: office_air_stale
+      # On when ANY air node is stale (above) or its ESPHome API is
+      # disconnected (status sensor off). Single entity to alert on.
+      - name: "Air Fleet Problem"
+        unique_id: air_fleet_problem
         device_class: problem
         state: >
-          {% set s = states.sensor.office_air_co2 %}
-          {{ s is none or (now() - s.last_updated).total_seconds() > 600 }}
+          {% set nodes = ['office', 'kitchen', 'bedroom', 'living'] %}
+          {% set stale = states('sensor.stale_air_nodes') not in ['', 'unknown', 'unavailable'] %}
+          {% set ns = namespace(disconnected=false) %}
+          {% for n in nodes %}
+            {% if is_state('binary_sensor.' ~ n ~ '_air_status', 'off') %}
+              {% set ns.disconnected = true %}
+            {% endif %}
+          {% endfor %}
+          {{ stale or ns.disconnected }}
 
 # --- Example alerting automation (add to automations.yaml when ready) ---
-# - alias: "Alert: critical sensor stale"
-#   id: alert_sensor_stale
+# - alias: "Alert: air fleet problem"
+#   id: alert_air_fleet_problem
 #   trigger:
 #     - platform: state
-#       entity_id: binary_sensor.office_air_stale
+#       entity_id: binary_sensor.air_fleet_problem
 #       to: "on"
 #       for: "00:05:00"
 #   action:
 #     - service: notify.notify_group
 #       data:
-#         title: "Sensor offline"
-#         message: "Office Air has not reported in over 10 minutes."
+#         title: "Air sensor offline"
+#         message: >
+#           Air nodes stale or disconnected: {{ states('sensor.stale_air_nodes') }}
+#
+# NOTE: every alert above flows THROUGH Home Assistant — if HA itself is down,
+# nothing fires. Close that loop in Phase 7 with an external dead-man's switch:
+# a Healthchecks.io ping automation, or an Uptime Kuma LXC on the Proxmox host
+# watching HA from outside the VM. See docs/08-audit-2026-06.md.
 #
 # NVMe free-space + UPS state: add via the System Monitor and NUT integrations
 # (UI config entries) in Phase 1/7, then alert on their entities here.

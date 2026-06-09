@@ -15,8 +15,8 @@ esp32:
 
 packages:
   base: !include common/base.yaml
-  air:  !include common/sensors_common.yaml
-  aqx:  !include common/sensors_air_full.yaml
+  air: !include common/sensors_common.yaml
+  aqx: !include common/sensors_air_full.yaml
 
 # I²C bus shared by SCD41 (0x62) and SGP41 (0x59).
 i2c:

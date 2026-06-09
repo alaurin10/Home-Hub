@@ -503,13 +503,14 @@ Open a PR → merge → delete the test branch.
 
 ## H. Pin HA version in CI
 
-Once HA is running, check the version and update the CI workflow:
+Once HA is running, check the version and update the pin file:
 
 1. HA: Settings → System → About → note `Home Assistant 2026.X.Y`
-2. In the repo, update `.github/workflows/ha-check.yml`:
-   ```yaml
-   ghcr.io/home-assistant/home-assistant:2026.X   # ← your major.minor
+2. In the repo, edit **`.ha-version`** (one line, your major.minor):
    ```
+   2026.X
+   ```
+   (Also set `.esphome-version` to the ESPHome add-on's version once installed.)
 3. Commit and push — CI will now validate against exactly your installed version.
 
 See `docs/07-github-setup.md` §5 for the full process.

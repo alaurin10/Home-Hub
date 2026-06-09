@@ -70,10 +70,17 @@ Firewall the runner LXC to allow only:
 
 ## 5. Keeping CI pinned to your HA version
 
-When you upgrade Home Assistant, update the image tag in `.github/workflows/ha-check.yml`:
+The pins live in two one-line files at the repo root (the workflows read them):
 
-```yaml
-ghcr.io/home-assistant/home-assistant:2026.5   # ← change to your installed version
-```
+- `.ha-version` — the HA image tag for `ha-check.yml` (format `202X.Y`, no
+  leading zero on the month)
+- `.esphome-version` — the exact ESPHome release for `esphome-validate.yml`
+  (match the ESPHome add-on version)
 
-Check your version: **Settings → System → About** → `Home Assistant 202X.Y.Z` → use `202X.Y`.
+When you upgrade HA or the ESPHome add-on, edit the matching file and push —
+no workflow edits needed. Check your HA version: **Settings → System → About**
+→ `Home Assistant 202X.Y.Z` → use `202X.Y`.
+
+The weekly `upgrade-canary.yml` workflow validates against the **latest** HA
+image and ESPHome release regardless of the pins — if it goes red, fix the
+config *before* you upgrade.

@@ -1,0 +1,54 @@
+name: upgrade-canary
+
+# Weekly early-warning run: validates the repo against the LATEST Home
+# Assistant image and LATEST ESPHome release (ignoring the pins in
+# .ha-version / .esphome-version). A red run here means an upcoming upgrade
+# will break config — fix BEFORE upgrading. Never blocks PRs (schedule +
+# manual trigger only). See docs/08-audit-2026-06.md.
+
+on:
+  schedule:
+    - cron: "0 6 * * 1" # Mondays 06:00 UTC
+  workflow_dispatch:
+
+jobs:
+  ha-latest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Provide dummy secrets
+        run: cp secrets.yaml.example secrets.yaml
+
+      - name: Home Assistant check_config (latest)
+        run: |
+          docker run --rm -v "${PWD}:/config" \
+            ghcr.io/home-assistant/home-assistant:latest \
+            python -m homeassistant --script check_config -c /config
+
+  esphome-latest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install ESPHome (latest)
+        run: pip install esphome
+
+      - name: Provide dummy secrets
+        run: cp esphome/secrets.yaml.example esphome/secrets.yaml
+
+      - name: Validate every node config (schema only, no compile)
+        run: |
+          shopt -s nullglob
+          status=0
+          for f in esphome/*.yaml; do
+            [ "$(basename "$f")" = "secrets.yaml" ] && continue
+            echo "::group::esphome config $f"
+            esphome config "$f" || status=1
+            echo "::endgroup::"
+          done
+          exit $status

@@ -1,0 +1,34 @@
+name: lint
+
+# Hygiene gate: YAML lint (style/syntax beyond what HA/ESPHome schema checks
+# catch) + gitleaks secret scanning over the full history. The .gitignore
+# keeps secrets.yaml out of git; gitleaks catches the other failure mode —
+# a token pasted into a TRACKED file. See docs/08-audit-2026-06.md.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  yamllint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install yamllint
+        run: pip install yamllint
+
+      - name: yamllint
+        run: yamllint .
+
+  gitleaks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # full history so leaks in old commits are found
+
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

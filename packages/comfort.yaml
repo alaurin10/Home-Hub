@@ -1,0 +1,128 @@
+# Derived comfort metrics — zero hardware, computed from the air nodes'
+# existing temperature + humidity. Dew point (Magnus formula) and absolute
+# humidity (g/m³) are far more actionable than raw RH% — e.g. dew point >16 °C
+# feels muggy; absolute humidity shows whether opening a window will actually
+# dry the room. Per-room entities follow the locked naming convention
+# (sensor.<location>_air_<measurement>, docs/01-naming-conventions.md).
+#
+# Deliberately NOT added to the InfluxDB/HomeKit allowlists (packages/
+# influxdb.yaml, packages/homekit.yaml) — they are derived from data already
+# forwarded. Add them explicitly there if you want them charted/surfaced.
+
+template:
+  - sensor:
+      # ------------------------------- Office -------------------------------
+      - name: "Office Air Dew Point"
+        unique_id: office_air_dew_point
+        unit_of_measurement: "°C"
+        device_class: temperature
+        state_class: measurement
+        availability: >
+          {{ has_value('sensor.office_air_temperature')
+             and has_value('sensor.office_air_humidity') }}
+        state: >
+          {% set t = states('sensor.office_air_temperature') | float(20) %}
+          {% set rh = [states('sensor.office_air_humidity') | float(50), 1] | max %}
+          {% set g = log(rh / 100) + (17.62 * t) / (243.12 + t) %}
+          {{ (243.12 * g / (17.62 - g)) | round(1) }}
+
+      - name: "Office Air Absolute Humidity"
+        unique_id: office_air_absolute_humidity
+        unit_of_measurement: "g/m³"
+        icon: mdi:water-percent
+        state_class: measurement
+        availability: >
+          {{ has_value('sensor.office_air_temperature')
+             and has_value('sensor.office_air_humidity') }}
+        state: >
+          {% set t = states('sensor.office_air_temperature') | float(20) %}
+          {% set rh = states('sensor.office_air_humidity') | float(50) %}
+          {% set svp = 6.112 * e ** ((17.62 * t) / (243.12 + t)) %}
+          {{ (216.7 * (rh / 100 * svp) / (273.15 + t)) | round(1) }}
+
+      # ------------------------------ Kitchen -------------------------------
+      - name: "Kitchen Air Dew Point"
+        unique_id: kitchen_air_dew_point
+        unit_of_measurement: "°C"
+        device_class: temperature
+        state_class: measurement
+        availability: >
+          {{ has_value('sensor.kitchen_air_temperature')
+             and has_value('sensor.kitchen_air_humidity') }}
+        state: >
+          {% set t = states('sensor.kitchen_air_temperature') | float(20) %}
+          {% set rh = [states('sensor.kitchen_air_humidity') | float(50), 1] | max %}
+          {% set g = log(rh / 100) + (17.62 * t) / (243.12 + t) %}
+          {{ (243.12 * g / (17.62 - g)) | round(1) }}
+
+      - name: "Kitchen Air Absolute Humidity"
+        unique_id: kitchen_air_absolute_humidity
+        unit_of_measurement: "g/m³"
+        icon: mdi:water-percent
+        state_class: measurement
+        availability: >
+          {{ has_value('sensor.kitchen_air_temperature')
+             and has_value('sensor.kitchen_air_humidity') }}
+        state: >
+          {% set t = states('sensor.kitchen_air_temperature') | float(20) %}
+          {% set rh = states('sensor.kitchen_air_humidity') | float(50) %}
+          {% set svp = 6.112 * e ** ((17.62 * t) / (243.12 + t)) %}
+          {{ (216.7 * (rh / 100 * svp) / (273.15 + t)) | round(1) }}
+
+      # ------------------------------ Bedroom -------------------------------
+      - name: "Bedroom Air Dew Point"
+        unique_id: bedroom_air_dew_point
+        unit_of_measurement: "°C"
+        device_class: temperature
+        state_class: measurement
+        availability: >
+          {{ has_value('sensor.bedroom_air_temperature')
+             and has_value('sensor.bedroom_air_humidity') }}
+        state: >
+          {% set t = states('sensor.bedroom_air_temperature') | float(20) %}
+          {% set rh = [states('sensor.bedroom_air_humidity') | float(50), 1] | max %}
+          {% set g = log(rh / 100) + (17.62 * t) / (243.12 + t) %}
+          {{ (243.12 * g / (17.62 - g)) | round(1) }}
+
+      - name: "Bedroom Air Absolute Humidity"
+        unique_id: bedroom_air_absolute_humidity
+        unit_of_measurement: "g/m³"
+        icon: mdi:water-percent
+        state_class: measurement
+        availability: >
+          {{ has_value('sensor.bedroom_air_temperature')
+             and has_value('sensor.bedroom_air_humidity') }}
+        state: >
+          {% set t = states('sensor.bedroom_air_temperature') | float(20) %}
+          {% set rh = states('sensor.bedroom_air_humidity') | float(50) %}
+          {% set svp = 6.112 * e ** ((17.62 * t) / (243.12 + t)) %}
+          {{ (216.7 * (rh / 100 * svp) / (273.15 + t)) | round(1) }}
+
+      # ------------------------------- Living -------------------------------
+      - name: "Living Air Dew Point"
+        unique_id: living_air_dew_point
+        unit_of_measurement: "°C"
+        device_class: temperature
+        state_class: measurement
+        availability: >
+          {{ has_value('sensor.living_air_temperature')
+             and has_value('sensor.living_air_humidity') }}
+        state: >
+          {% set t = states('sensor.living_air_temperature') | float(20) %}
+          {% set rh = [states('sensor.living_air_humidity') | float(50), 1] | max %}
+          {% set g = log(rh / 100) + (17.62 * t) / (243.12 + t) %}
+          {{ (243.12 * g / (17.62 - g)) | round(1) }}
+
+      - name: "Living Air Absolute Humidity"
+        unique_id: living_air_absolute_humidity
+        unit_of_measurement: "g/m³"
+        icon: mdi:water-percent
+        state_class: measurement
+        availability: >
+          {{ has_value('sensor.living_air_temperature')
+             and has_value('sensor.living_air_humidity') }}
+        state: >
+          {% set t = states('sensor.living_air_temperature') | float(20) %}
+          {% set rh = states('sensor.living_air_humidity') | float(50) %}
+          {% set svp = 6.112 * e ** ((17.62 * t) / (243.12 + t)) %}
+          {{ (216.7 * (rh / 100 * svp) / (273.15 + t)) | round(1) }}
