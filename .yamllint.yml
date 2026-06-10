@@ -1,0 +1,23 @@
+# yamllint config tuned for Home Assistant / ESPHome / GitHub Actions YAML.
+# Style-only gate; real schema validation is ha-check.yml / esphome-validate.yml.
+extends: default
+
+rules:
+  # HA config and Jinja templates routinely exceed 80 chars; readability wins.
+  line-length: disable
+  # GitHub Actions uses `on:` as a key; don't force quoting it.
+  truthy:
+    check-keys: false
+  # Allow the comment style used throughout (banner comments, inline notes).
+  comments:
+    min-spaces-from-content: 1
+  comments-indentation: disable
+  # ESPHome/HA examples commonly use compact lists.
+  brackets:
+    max-spaces-inside: 1
+  # Documents don't need the `---` start marker.
+  document-start: disable
+
+ignore: |
+  .esphome/
+  .storage/

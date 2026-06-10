@@ -73,6 +73,17 @@ Kitchen gas/PM is ~$21–29 (PMS7003 + SGP41) vs ~$40–50 for a SEN55.
 | Google Drive (15 GB free) | **$0/mo** | Enough for HA backups with Google Drive Backup add-on |
 | Google One (100 GB) | ~$2/mo | If backups exceed 15 GB |
 
+## Future / backlog (post-Phase 8 — see `docs/00-architecture.md` §18)
+
+| Item | Qty | ~Price | Notes |
+|---|---|---|---|
+| LD2410B mmWave presence module + ESP32 | per room | ~$8/node | True occupancy (`esp-<room>-presence`); LD2450 (~$12) adds multi-target tracking |
+| Zigbee metering smart plug | 2–3 | ~$15 ea | Per-appliance energy + AQ-driven actuation (purifier on PM2.5 spike) |
+| Zigbee leak sensor | 2–3 | ~$15–20 ea | Washer / sink / water heater; highest ROI-per-dollar |
+| HA Voice Preview Edition | 1 | ~$59 | Fully local voice (Whisper + Piper); complements Siri |
+| Emporia Vue 2 (reflash to ESPHome) | 1 | ~$80 | Whole-home CT-clamp energy, later |
+| Wall tablet (used/refurb) | 1 | ~$50–120 | Kiosk dashboard, optional |
+
 ---
 
 ## Add-ons (free, no hardware cost)

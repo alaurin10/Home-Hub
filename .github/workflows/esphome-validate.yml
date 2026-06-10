@@ -5,10 +5,10 @@ name: esphome-validate
 
 on:
   pull_request:
-    paths: ["esphome/**"]
+    paths: ["esphome/**", ".esphome-version"]
   push:
     branches: [main]
-    paths: ["esphome/**"]
+    paths: ["esphome/**", ".esphome-version"]
 
 jobs:
   validate:
@@ -20,8 +20,11 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install ESPHome
-        run: pip install esphome
+      - name: Install ESPHome (pinned)
+        # Pinned via .esphome-version to match the ESPHome add-on. Update the
+        # file when you upgrade the add-on so CI validates what you actually
+        # run. The weekly upgrade-canary workflow tests the latest release.
+        run: pip install "esphome==$(cat .esphome-version)"
 
       - name: Provide dummy secrets
         run: cp esphome/secrets.yaml.example esphome/secrets.yaml

@@ -13,6 +13,7 @@ on:
       - "scenes.yaml"
       - "dashboards/**"
       - "secrets.yaml.example"
+      - ".ha-version"
   push:
     branches: [main]
     paths:
@@ -23,6 +24,7 @@ on:
       - "scenes.yaml"
       - "dashboards/**"
       - "secrets.yaml.example"
+      - ".ha-version"
 
 jobs:
   check:
@@ -34,11 +36,13 @@ jobs:
         run: cp secrets.yaml.example secrets.yaml
 
       - name: Home Assistant check_config
-        # Pinned to HA 2026.5. Update this when you upgrade HA:
-        #   Settings → System → About → note the version → change the tag below.
-        # Available tags: https://github.com/home-assistant/core/pkgs/container/home-assistant
-        # Format: YYYY.M (no leading zero on month), e.g. 2026.5, 2026.6, 2026.12
+        # Pinned via the .ha-version file (single source of truth). Update it
+        # when you upgrade HA: Settings → System → About → note the version →
+        # edit .ha-version. Format: YYYY.M (no leading zero on month), e.g.
+        # 2026.5, 2026.6, 2026.12. Available tags:
+        # https://github.com/home-assistant/core/pkgs/container/home-assistant
         run: |
+          HA_VERSION="$(cat .ha-version)"
           docker run --rm -v "${PWD}:/config" \
-            ghcr.io/home-assistant/home-assistant:2026.5 \
+            "ghcr.io/home-assistant/home-assistant:${HA_VERSION}" \
             python -m homeassistant --script check_config -c /config

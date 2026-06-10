@@ -6,6 +6,8 @@
 - [ ] Private repo on GitHub; this tree pushed.
 - [ ] Naming doc complete; **first 3 devices named** (`01-naming-conventions.md`).
 - [ ] CI workflow files exist (`esphome-validate.yml`, `ha-check.yml`, `deploy.yml`).
+- [ ] `lint.yml` (yamllint + gitleaks) green on a PR; `upgrade-canary.yml` runs
+      green via manual dispatch (Actions → upgrade-canary → Run workflow).
 
 ## Phase 1 — host/HA
 - [ ] HA loads on LAN **and** on cellular via Tailscale.
@@ -16,6 +18,10 @@
 - [ ] State updates on interval; **breathe near the CO2 sensor → value rises in
       ~30–60 s**.
 - [ ] Connection sensor "connected"; **OTA an update successfully**; CI green.
+- [ ] Unplug a node → `binary_sensor.air_fleet_problem` turns **on** within
+      ~10 min and `sensor.stale_air_nodes` names the room; replug → clears.
+- [ ] Comfort sensors plausible: `sensor.<room>_air_dew_point` below room temp;
+      `sensor.<room>_air_absolute_humidity` roughly 5–15 g/m³ indoors.
 
 ## Phase 3 — Apple Home
 - [ ] Accessory shows live AQ/CO2; test toggle flips HA ≤1 s.

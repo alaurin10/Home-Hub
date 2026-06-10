@@ -22,6 +22,8 @@ Assistant's `/config` directory, so this repo *is* the configuration.
   naming rules + the device registry. Read **before** adding any device.
 - **[`docs/03-bill-of-materials.md`](docs/03-bill-of-materials.md)** — what to buy, per phase.
 - **[`docs/06-verification.md`](docs/06-verification.md)** — how each phase is verified.
+- **[`docs/08-audit-2026-06.md`](docs/08-audit-2026-06.md)** — June 2026 project
+  audit: findings, hardening checklist, and the prioritized feature backlog.
 
 ## Repository layout
 
