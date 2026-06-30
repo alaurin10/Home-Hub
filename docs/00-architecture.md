@@ -73,13 +73,16 @@ at once (one radio per protocol).
 
 **Host layer (one mini PC):**
 ```
-  Proxmox host  (N150/N305 mini PC · 16–32 GB · NVMe · on UPS)
+  Proxmox host  (mini PC · 16 GB · SSD · on UPS)
   ├── VM: Home Assistant OS  ── Supervisor add-ons:
   │        ESPHome · Mosquitto · Zigbee2MQTT · InfluxDB 2.x ·
   │        Grafana · MariaDB · Tailscale · SSH/VS Code Server
   │        └── USB passthrough (by Device ID) ──► ZBT-2 Zigbee coordinator
-  └── (room to grow) LXC/VM for "a few extras": Pi-hole, Node-RED,
-      a later Frigate NVR, or a Docker host — isolated from HA
+  ├── VM: Docker host (Debian) ── containerized apps (separate repos; data gitignored):
+  │        garmin-mcp (+ future MCP servers) · Garmin insights dashboard
+  │        (FastAPI + React + sync job + DB — distinct from the MCP data path)
+  ├── LXC: Pi-hole ── network-wide DNS filtering
+  └── (room to grow) Node-RED · a later Frigate NVR — isolated from HA
 ```
 
 **Device + data flow:**
