@@ -1,5 +1,5 @@
 # 02 — Phase 1: Detailed Setup Guide
-## Proxmox + Home Assistant OS + Network + Add-ons + Git
+## Proxmox + Home Assistant OS + Pi-hole + Docker host + Network + Add-ons + Git
 
 > See `docs/00-architecture.md` §1, §3, §5 for design rationale.
 > Fill in your exact values (IPs, VLAN IDs, MAC addresses) as you work through this.
@@ -102,33 +102,84 @@ you finish Phase 1. Everything else is close enough in price that Amazon is wort
 
 ## B. Proxmox VE installation
 
-### B1. Prepare the installer
+### B1. Download and flash the Proxmox installer to a USB stick
 
-1. Download **Proxmox VE ISO** (current: 8.x) from `https://www.proxmox.com/en/downloads`
-2. Flash to a USB drive (8 GB+):
-   - **Windows:** Rufus → GPT + UEFI → write in DD mode
-   - **macOS/Linux:** `sudo dd if=proxmox-ve_*.iso of=/dev/sdX bs=4M status=progress && sync`
-   - **Balena Etcher** works on all platforms
+**Download the ISO:**
+1. On any computer, go to `https://www.proxmox.com/en/downloads` → **Proxmox Virtual
+   Environment** → download the latest **Proxmox VE 8.x ISO Installer** (~1.3 GB).
+2. *(Recommended)* Verify the download isn't corrupt — the download page lists a SHA-256
+   checksum next to the file:
+   - **Windows (PowerShell):** `Get-FileHash .\proxmox-ve_*.iso -Algorithm SHA256`
+   - **macOS/Linux:** `shasum -a 256 proxmox-ve_*.iso`
+   - The printed hash must match the website's. (A bad ISO = a failed/odd install.)
 
-### B2. Install Proxmox on the mini PC
+**Flash it to the USB stick (8 GB+). Pick ONE method:**
 
-1. Plug in USB, HDMI monitor, keyboard, and ethernet to your router/switch.
-2. Power on → hit the boot-device key (usually **F7**, **F11**, or **F12**; check your model).
-3. Select **"Graphical Install"** (or text if display has issues).
-4. Accept EULA → select the **NVMe disk** as the target.
-5. **Country / Timezone:** set your actual timezone — this flows into HA.
-6. **Password + email:** set a strong root password; email is for alerts (can be fake).
-7. **Network:**
-   - Hostname: `pve.home` (or `pve.local` — pick one and keep it)
-   - IP: give it a **static IP** on your main LAN (e.g., `192.168.1.10/24`)
+> ⚠️ Flashing **erases the entire USB stick.** Back up anything on it first, and
+> double-check you're selecting the USB — not your computer's own disk.
+
+**Option A — Balena Etcher (easiest; Windows/macOS/Linux):**
+1. Get Etcher from `https://etcher.balena.io`, install, and open it.
+2. **Flash from file** → select the Proxmox ISO.
+3. **Select target** → choose your USB stick (verify by size).
+4. **Flash!** → wait for "Flash Complete", then eject.
+
+**Option B — Rufus (Windows):**
+1. Get Rufus from `https://rufus.ie` and open it.
+2. **Device** → your USB stick. **Boot selection** → the Proxmox ISO.
+3. **Partition scheme: GPT**, **Target system: UEFI**.
+4. **START** → if it asks about "ISOHybrid image", choose **Write in DD Image mode** → OK.
+
+**Option C — `dd` (macOS/Linux; advanced):**
+1. Identify the USB device **carefully** — the wrong name wipes that disk:
+   - **Linux:** `lsblk` (find your stick by size, e.g. `/dev/sdb`)
+   - **macOS:** `diskutil list` (e.g. `/dev/disk4`), then `diskutil unmountDisk /dev/disk4`
+2. Write it (replace `sdX` / `diskN` with YOUR device):
+   - **Linux:** `sudo dd if=proxmox-ve_*.iso of=/dev/sdX bs=4M status=progress oflag=sync`
+   - **macOS:** `sudo dd if=proxmox-ve_*.iso of=/dev/rdiskN bs=4m && sync`
+3. Eject when it finishes.
+
+### B2. Prepare the BIOS and boot from the USB (HP EliteDesk 600 G3 Mini)
+
+Two goals: (a) enable virtualization so Proxmox can run VMs, and (b) boot the USB stick.
+The keys below are for the **HP EliteDesk 600/800 G3 Mini**; other machines differ (often
+`F2`/`Del` for BIOS setup, `F7`/`F11`/`F12` for the one-time boot menu).
+
+1. Plug the USB stick, an HDMI monitor, a USB keyboard, and ethernet into the mini PC.
+   Power it on.
+2. **Enter BIOS setup:** tap **`F10`** repeatedly at the HP splash screen.
+3. **Enable virtualization** (required for VMs/LXCs):
+   - **Advanced → System Options** (or **Security → System Security** on some versions):
+     - **Virtualization Technology (VTx)** → **Enabled**
+     - **Virtualization Technology for Directed I/O (VTd)** → **Enabled**
+       *(needed for USB passthrough of the Zigbee stick in Phase 5)*
+4. **Boot mode:** **Advanced → Boot Options** → ensure **UEFI** is on (not Legacy/CSM).
+5. **Secure Boot:** Proxmox VE 8 supports it, but if the installer refuses to boot, come
+   back here (**Advanced → Secure Boot**) and **disable** it.
+6. **Save & exit:** **`F10`** → **Yes**. The PC reboots.
+7. **Boot the USB:** as it powers back on, tap **`F9`** for the **boot menu** → select the
+   USB stick (often shown as "UEFI: <USB brand>").
+   - Not listed? Re-check the flash (B1) and try a **rear USB port** (most reliable).
+
+### B3. Install Proxmox
+
+1. After the USB boots (B2), the Proxmox menu appears → select
+   **"Install Proxmox VE (Graphical)"**.
+2. Accept the EULA → choose the **target disk = your internal SSD** (the 128 GB drive —
+   **NOT** the USB stick). Install **erases** that disk; confirm it's the right one.
+3. **Country / Timezone / Keyboard:** set your real timezone (it flows into HA later).
+4. **Password + email:** strong root password; email can be real or throwaway (used for alerts).
+5. **Management network:**
+   - Hostname (FQDN): `pve.home.arpa` (or `pve.local` — pick one and keep it)
+   - IP: a **static IP** on your main LAN (e.g., `192.168.1.10/24`)
    - Gateway: your router IP (e.g., `192.168.1.1`)
-   - DNS: `1.1.1.1` (or your router if it resolves local names)
-8. Confirm → install (5–10 min) → reboot → remove USB when prompted.
-9. Access the web UI: `https://192.168.1.10:8006` from any browser on your LAN.
-   - Browser will warn "certificate not trusted" — this is normal; proceed.
-   - Login: `root` / your password.
+   - DNS: `1.1.1.1`
+6. Review → **Install** (5–10 min) → **Reboot**, and **remove the USB stick** as it restarts.
+7. From any browser on your LAN, open `https://192.168.1.10:8006`:
+   - "Certificate not trusted" is normal (self-signed) → proceed/accept.
+   - Log in: user **`root`**, your password, Realm **"Linux PAM"**.
 
-### B3. Post-install Proxmox config
+### B4. Post-install Proxmox config
 
 **Remove enterprise repo (required if no Proxmox subscription):**
 In the web UI: Node (left sidebar) → Shell → run:
@@ -159,11 +210,26 @@ systemctl restart pveproxy
 grep -E 'vmx|svm' /proc/cpuinfo | head -1
 dmesg | grep -E 'IOMMU|iommu'
 ```
-If VT-d shows nothing, enter BIOS (del/F2 on boot) and enable Intel VT-d / IOMMU.
+If VT-d shows nothing, reboot into BIOS (**`F10`** on the HP) and enable **VTx + VTd** (see B2).
 
 ---
 
-## C. Home Assistant OS VM
+## C. Create the guests (HA VM + Pi-hole LXC + Docker host VM)
+
+> Three guests run on Proxmox. **Home Assistant** is a full VM (it's an appliance);
+> **Pi-hole** is a lightweight LXC; the **Docker host** is a small VM that will later run
+> your containerized apps (garmin-mcp + the Garmin dashboard). Sized to fit the **128 GB
+> SSD** with room for snapshots/backups:
+
+| Guest | Type | vCPU | RAM | Disk | Created in |
+|---|---|---|---|---|---|
+| Home Assistant OS | VM | 2 | 4 GB | 48 GB | C1–C3 |
+| Pi-hole | LXC | 1 | 512 MB | 4 GB | C4 |
+| Docker host (Debian) | VM | 2 | 4 GB | 24 GB | C5 |
+
+> **Docker runs inside a VM, not an LXC** — Proxmox doesn't support Docker-in-LXC, and
+> nesting weakens isolation + breaks on kernel/systemd updates. A small Debian VM is the
+> supportable path with full kernel isolation.
 
 ### C1. Create the VM with the community helper script
 
@@ -188,10 +254,10 @@ The script downloads the latest HA OS image and creates the VM automatically.
 
 After the script completes, find the new VM in the sidebar (usually VM ID 100+).
 
-**Increase resources if needed** (Hardware tab):
-- Processors: 4 (or 2 for now; easy to change later)
-- Memory: 4096 MB minimum; 8192 MB if your mini PC has 16+ GB
-- Hard Disk: resize to 64 GB minimum (select disk → Disk Action → Resize → add 32 GB)
+**Set resources to fit the 3-guest budget** (Hardware tab):
+- Processors: 2 (plenty for HA; leaves cores for the other guests — easy to raise later)
+- Memory: 4096 MB (HA is comfortable in 4 GB; the rest is reserved for the Docker VM + Pi-hole)
+- Hard Disk: 48 GB (select disk → Disk Action → Resize). Thin-provisioned; grow it later if needed.
 
 **Note the VM ID** (you'll need it for USB passthrough in Phase 5).
 
@@ -214,6 +280,81 @@ Settings → System → General → scroll to "System time" — must show curren
 **Note your HA version:**
 Settings → System → About → e.g. `Home Assistant 2026.5.3`
 → Update `ha-check.yml` with `2026.5` (the `YYYY.M` part).
+
+### C4. Pi-hole LXC (the second guest)
+
+Pi-hole gives network-wide ad/tracker blocking via DNS. It runs **natively in a tiny Debian
+LXC** — no Docker needed.
+
+**Create it with the community helper script (easiest):**
+1. Proxmox UI → select your node (`pve`) → **Shell**.
+2. Grab the current Pi-hole LXC command from **`https://community-scripts.github.io/ProxmoxVE/`**
+   (search "Pi-hole"), or run:
+   ```bash
+   bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/ct/pihole.sh)"
+   ```
+3. Choose **Default**, or **Advanced** to set: unprivileged LXC, Debian 12,
+   **1 vCPU, 512 MB RAM, 4 GB disk**.
+4. At the end the script prints the **LXC IP** and the **admin URL** — note them.
+
+**Give it a fixed address + set the password:**
+5. Give the LXC a **static IP** (or a DHCP reservation on your router) so it never moves —
+   DNS depends on it.
+6. Set the admin password: select the LXC → **Console** → `pihole setpassword`.
+7. Open `http://<pihole-ip>/admin` → log in.
+
+**Point your network at Pi-hole (so it actually filters):**
+8. On your router, set the **DHCP "DNS server" option to the Pi-hole IP** (covers every
+   device). Apply, then renew a lease / reboot a device to pick it up.
+   - **Reliability note:** Pi-hole as the *only* DNS = full filtering but a dependency — if
+     the LXC is down, DNS stops. It's very stable; keep it running, or add a public secondary
+     DNS and accept that some queries then bypass filtering.
+
+**Verify:**
+9. From a device now using Pi-hole — normal sites resolve, and a known ad domain is blocked:
+   ```bash
+   nslookup doubleclick.net <pihole-ip>     # should return 0.0.0.0 (blocked)
+   ```
+   The admin **Query Log** should show live traffic.
+
+> **Manual alternative:** create a Debian 12 LXC from a template, then run the official
+> installer inside it: `curl -sSL https://install.pi-hole.net | bash`.
+
+### C5. Docker host VM (the third guest)
+
+A small Debian VM running Docker. It stays **empty for now** — later phases `git clone` your
+garmin-mcp and Garmin-dashboard repos here and bring each up with `docker compose`.
+
+**Create the Debian VM:**
+1. **Easiest** — community **Debian VM** helper script: grab the current command from
+   **`https://community-scripts.github.io/ProxmoxVE/`** (search "Debian VM") and run it in the
+   Proxmox **Shell**. Set **2 vCPU, 4 GB RAM, 24 GB disk**, and a **static IP**.
+2. **Manual alternative** — download the **Debian 12 netinstall ISO**
+   (`https://www.debian.org/distrib/`), upload it (Datacenter → your storage → ISO Images →
+   Upload), create a VM (q35 / OVMF, 2 vCPU, 4 GB, 24 GB), and install Debian with the
+   **SSH server** + **standard system utilities** options ticked.
+
+**Install Docker (inside the VM — Console or SSH):**
+3. Install Docker Engine + the Compose plugin via Docker's official script:
+   ```bash
+   curl -fsSL https://get.docker.com | sh
+   sudo usermod -aG docker $USER        # run docker without sudo (log out/in after)
+   ```
+4. Verify:
+   ```bash
+   docker run hello-world               # prints a success message
+   docker compose version               # v2 Compose is included
+   ```
+
+**Leave it ready:**
+5. *(Optional)* install **Tailscale** for remote admin:
+   `curl -fsSL https://tailscale.com/install.sh | sh`.
+6. Done — the VM is ready and empty. The **garmin-mcp migration** and the **Garmin dashboard
+   build** are separate later phases (each its own repo, deployed here; the MCP server gets
+   exposed via your existing **Cloudflare Tunnel** — point a `cloudflared` container/route at
+   this VM then, no inbound ports).
+
+> Health data the Garmin app syncs must be **gitignored** — the code is shareable, your data isn't.
 
 ---
 
@@ -539,14 +680,16 @@ Take these **before any further configuration** — this is your safe rollback p
 
 ## Phase 1 DoD checklist
 
-- [ ] Proxmox web UI accessible at `https://[mini-PC-IP]:8006`
+- [ ] Proxmox web UI accessible at `https://[mini-PC-IP]:8006`; all 3 guests in the tree
 - [ ] HA accessible at `http://homeassistant.local:8123` (LAN)
 - [ ] HA accessible via Tailscale on cellular (WiFi off → Tailscale IP works)
 - [ ] Settings → System → About → timezone and clock correct
 - [ ] Settings → System → Database → shows MariaDB (not SQLite)
+- [ ] **Pi-hole LXC** running; `http://<pihole-ip>/admin` loads; a client gets filtered DNS
+- [ ] **Docker host VM** running; `docker run hello-world` succeeds; otherwise empty/ready
 - [ ] `git push` works from HA shell; CI goes green
 - [ ] `secrets.yaml` and `esphome/secrets.yaml` do NOT appear in `git status`
 - [ ] Advanced SSH, Studio Code Server, Tailscale, MariaDB, NUT add-ons installed
-- [ ] Proxmox snapshot `phase1-baseline` exists
+- [ ] Proxmox snapshot taken per guest (`phase1-baseline-ha`, `-pihole`, `-docker`)
 - [ ] HA backup `phase1-baseline` downloaded off-server
 - [ ] (Optional) IoT VLAN configured with mDNS reflector
