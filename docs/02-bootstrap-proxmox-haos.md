@@ -106,7 +106,9 @@ you finish Phase 1. Everything else is close enough in price that Amazon is wort
 
 **Download the ISO:**
 1. On any computer, go to `https://www.proxmox.com/en/downloads` → **Proxmox Virtual
-   Environment** → download the latest **Proxmox VE 8.x ISO Installer** (~1.3 GB).
+   Environment** → download the latest **Proxmox VE ISO Installer** (currently the 9.x
+   branch, ~1.3 GB; built on Debian 13 "trixie"). Use the newest stable release — there's
+   no reason to install the older 8.x branch on a fresh build.
 2. *(Recommended)* Verify the download isn't corrupt — the download page lists a SHA-256
    checksum next to the file:
    - **Windows (PowerShell):** `Get-FileHash .\proxmox-ve_*.iso -Algorithm SHA256`
@@ -154,7 +156,7 @@ The keys below are for the **HP EliteDesk 600/800 G3 Mini**; other machines diff
      - **Virtualization Technology for Directed I/O (VTd)** → **Enabled**
        *(needed for USB passthrough of the Zigbee stick in Phase 5)*
 4. **Boot mode:** **Advanced → Boot Options** → ensure **UEFI** is on (not Legacy/CSM).
-5. **Secure Boot:** Proxmox VE 8 supports it, but if the installer refuses to boot, come
+5. **Secure Boot:** Proxmox VE supports it, but if the installer refuses to boot, come
    back here (**Advanced → Secure Boot**) and **disable** it.
 6. **Save & exit:** **`F10`** → **Yes**. The PC reboots.
 7. **Boot the USB:** as it powers back on, tap **`F9`** for the **boot menu** → select the
@@ -181,16 +183,37 @@ The keys below are for the **HP EliteDesk 600/800 G3 Mini**; other machines diff
 
 ### B4. Post-install Proxmox config
 
-**Remove enterprise repo (required if no Proxmox subscription):**
-In the web UI: Node (left sidebar) → Shell → run:
-```bash
-# Replace enterprise repo with community no-subscription repo
-sed -i 's|^deb https://enterprise.proxmox.com|# deb https://enterprise.proxmox.com|' \
-    /etc/apt/sources.list.d/pve-enterprise.list
+**Switch to the no-subscription repo (required if no Proxmox subscription):**
 
-echo "deb http://download.proxmox.com/debian/pve bookworm pve-no-subscription" \
-    > /etc/apt/sources.list.d/pve-no-subscription.list
+> **PVE 9 changed the repo file format** — it's now `deb822` (`.sources` files), not the
+> old one-line `.list` format. The commands below are for **PVE 9 (trixie)**. If you ended
+> up on PVE 8 instead, see the fallback at the end of this block.
+
+**Easiest — GUI:** Node (left sidebar) → **Updates → Repositories** → click **Add** →
+select **No-Subscription** → also click on the `pve-enterprise` entry → **Disable**.
+
+**Or via Shell** (Node → **Shell**):
+```bash
+# Disable the enterprise repo (PVE 9 / deb822 format)
+sed -i '$a Enabled: false' /etc/apt/sources.list.d/pve-enterprise.sources
+
+# Add the no-subscription repo
+cat > /etc/apt/sources.list.d/pve-no-subscription.sources << 'EOF'
+Types: deb
+URIs: http://download.proxmox.com/debian/pve
+Suites: trixie
+Components: pve-no-subscription
+Signed-By: /usr/share/keyrings/proxmox-archive-keyring.gpg
+EOF
 ```
+
+> **PVE 8 fallback (old `.list` format, "bookworm"):**
+> ```bash
+> sed -i 's|^deb https://enterprise.proxmox.com|# deb https://enterprise.proxmox.com|' \
+>     /etc/apt/sources.list.d/pve-enterprise.list
+> echo "deb http://download.proxmox.com/debian/pve bookworm pve-no-subscription" \
+>     > /etc/apt/sources.list.d/pve-no-subscription.list
+> ```
 
 **Update Proxmox:**
 ```bash
