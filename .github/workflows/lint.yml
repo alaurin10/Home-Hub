@@ -22,6 +22,20 @@ jobs:
       - name: yamllint
         run: yamllint .
 
+  # The "revisit with a CI drift check" from audit finding 2
+  # (docs/08-audit-2026-06.md): fail when configs reference entities nothing
+  # defines, or an ESPHome measurement is missing from the InfluxDB allowlist.
+  entity-drift:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install PyYAML
+        run: pip install pyyaml
+
+      - name: entity drift check
+        run: python3 scripts/check-entity-drift.py
+
   gitleaks:
     runs-on: ubuntu-latest
     permissions:
