@@ -1,0 +1,15 @@
+# Home-Hub dashboard — one more compose stack on the Proxmox Docker VM.
+# LAN-only; remote access rides Tailscale / Cloudflare Access (docs/00 §10).
+services:
+  dashboard:
+    build: .
+    container_name: home-hub-dashboard
+    ports:
+      - "8080:8080"
+    env_file: .env
+    volumes:
+      - dashboard-data:/data      # persisted drag-and-drop layout
+    restart: unless-stopped
+
+volumes:
+  dashboard-data:
