@@ -5,6 +5,7 @@ import asyncio
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
+from fastapi.exception_handlers import http_exception_handler
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -54,7 +55,7 @@ def create_app() -> FastAPI:
             # Client-side routes (/room/kitchen, /system) resolve to index.html
             if exc.status_code == 404 and request.method == "GET" and not request.url.path.startswith("/api"):
                 return FileResponse(settings.STATIC_DIR / "index.html")
-            raise exc
+            return await http_exception_handler(request, exc)
 
     return app
 
