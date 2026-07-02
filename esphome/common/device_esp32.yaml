@@ -1,0 +1,27 @@
+# =====================================================================
+# Shared ESP32 device package — the board/bus half of every current node
+# (base.yaml stays board-agnostic so a future ESP32-C6/Thread node can
+# reuse it with a different device file; see docs/00-architecture.md §1).
+# Nodes must define substitutions `node_name` and `friendly_name`.
+#
+#   packages:
+#     device: !include common/device_esp32.yaml
+#     base:   !include common/base.yaml
+#     air:    !include common/sensors_common.yaml
+# =====================================================================
+
+esphome:
+  name: ${node_name}
+  friendly_name: ${friendly_name}
+
+esp32:
+  board: esp32dev
+  framework:
+    type: esp-idf
+
+# I²C bus shared by all current sensors (SCD4x @ 0x62, SGP41 @ 0x59 —
+# no address conflict). A future non-I²C node can drop this with !remove.
+i2c:
+  sda: GPIO21
+  scl: GPIO22
+  scan: true

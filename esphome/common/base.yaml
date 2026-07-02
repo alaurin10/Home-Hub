@@ -26,6 +26,11 @@ ota:
   - platform: esphome
     password: !secret ota_password
 
+# Recovery rail for OTA fleet management: after repeated boot failures the
+# node comes up with WiFi + OTA only (no sensor stack), so a bad merged
+# config can always be re-flashed over the air — no ladder + USB cable.
+safe_mode:
+
 time:
   - platform: homeassistant
     id: homeassistant_time
