@@ -1,3 +1,4 @@
+import { motion } from "framer-motion";
 import { NavLink, useLocation } from "react-router-dom";
 
 import { useStore } from "../store";
@@ -7,6 +8,8 @@ const TABS = [
   { to: "/", label: "Home" },
   { to: "/system", label: "System" },
 ];
+
+const pillSpring = { type: "spring" as const, stiffness: 420, damping: 34 };
 
 export function Header() {
   const { config, connected, editMode, setEditMode } = useStore();
@@ -30,16 +33,25 @@ export function Header() {
         </span>
         <nav className="glass-chrome hidden items-center gap-1 rounded-full p-1 md:flex">
           {TABS.map((tab) => (
-            <NavLink
-              key={tab.to}
-              to={tab.to}
-              className={({ isActive }) =>
-                `rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors ${
-                  isActive ? "bg-ink text-surface" : "text-muted hover:text-ink-2"
-                }`
-              }
-            >
-              {tab.label}
+            <NavLink key={tab.to} to={tab.to} className="relative rounded-full px-3.5 py-1.5 text-sm font-medium">
+              {({ isActive }) => (
+                <>
+                  {isActive && (
+                    <motion.span
+                      layoutId="header-nav-pill"
+                      transition={pillSpring}
+                      className="absolute inset-0 rounded-full bg-ink"
+                    />
+                  )}
+                  <span
+                    className={`relative transition-colors duration-200 ${
+                      isActive ? "text-surface" : "text-muted hover:text-ink-2"
+                    }`}
+                  >
+                    {tab.label}
+                  </span>
+                </>
+              )}
             </NavLink>
           ))}
         </nav>

@@ -44,8 +44,9 @@ export function RoomCard({
       <motion.article
         layoutId={`room-${room.id}`}
         onClick={() => !editMode && navigate(`/room/${room.id}`)}
-        whileHover={editMode ? undefined : { y: -2 }}
-        whileTap={editMode ? undefined : { scale: 0.99 }}
+        whileHover={editMode ? undefined : { y: -3, scale: 1.005 }}
+        whileTap={editMode ? undefined : { scale: 0.985 }}
+        transition={{ type: "spring", stiffness: 320, damping: 24 }}
         className={`glass relative h-full cursor-pointer rounded-3xl p-5 transition-[filter] hover:brightness-[1.02] ${
           editMode ? "cursor-grab active:cursor-grabbing" : ""
         }`}

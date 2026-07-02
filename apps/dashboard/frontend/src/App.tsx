@@ -1,5 +1,5 @@
 import { AnimatePresence } from "framer-motion";
-import { useEffect } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import { Route, Routes, useLocation } from "react-router-dom";
 
 import { FleetBanner } from "./components/FleetBanner";
@@ -7,8 +7,11 @@ import { Header } from "./components/Header";
 import { TabBar } from "./components/TabBar";
 import { useStore } from "./store";
 import { HomeView } from "./views/HomeView";
-import { RoomView } from "./views/RoomView";
-import { SystemView } from "./views/SystemView";
+
+// Code-split the detail views: RoomView pulls in Recharts (~half the bundle),
+// which the Home grid never needs. First paint ships without it.
+const RoomView = lazy(() => import("./views/RoomView").then((m) => ({ default: m.RoomView })));
+const SystemView = lazy(() => import("./views/SystemView").then((m) => ({ default: m.SystemView })));
 
 export default function App() {
   const { init, ready } = useStore();
@@ -29,11 +32,13 @@ export default function App() {
       <Header />
       <FleetBanner />
       <AnimatePresence mode="wait">
-        <Routes location={location} key={location.pathname}>
-          <Route path="/" element={<HomeView />} />
-          <Route path="/room/:id" element={<RoomView />} />
-          <Route path="/system" element={<SystemView />} />
-        </Routes>
+        <Suspense fallback={null}>
+          <Routes location={location} key={location.pathname}>
+            <Route path="/" element={<HomeView />} />
+            <Route path="/room/:id" element={<RoomView />} />
+            <Route path="/system" element={<SystemView />} />
+          </Routes>
+        </Suspense>
       </AnimatePresence>
       <TabBar />
     </div>
