@@ -1,0 +1,74 @@
+@import "tailwindcss";
+
+/* Design tokens — validated reference palette (dark mode is selected, not
+   auto-inverted). Color is used only as signal; surfaces stay calm. */
+:root {
+  --page: #f9f9f7;
+  --surface: #fcfcfb;
+  --surface-2: #f4f3f0;
+  --ink: #0b0b0b;
+  --ink-2: #52514e;
+  --muted: #898781;
+  --hairline: #e1e0d9;
+  --baseline: #c3c2b7;
+  --ring: rgba(11, 11, 11, 0.1);
+
+  --status-good: #0ca30c;
+  --status-fair: #fab219;
+  --status-poor: #ec835a;
+  --status-bad: #d03b3b;
+
+  --series-1: #2a78d6;
+  --series-2: #1baf7a;
+  --series-3: #eda100;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --page: #0d0d0d;
+    --surface: #1a1a19;
+    --surface-2: #232322;
+    --ink: #ffffff;
+    --ink-2: #c3c2b7;
+    --muted: #898781;
+    --hairline: #2c2c2a;
+    --baseline: #383835;
+    --ring: rgba(255, 255, 255, 0.1);
+
+    --series-1: #3987e5;
+    --series-2: #199e70;
+    --series-3: #c98500;
+  }
+}
+
+@theme inline {
+  --color-page: var(--page);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-muted: var(--muted);
+  --color-hairline: var(--hairline);
+  --color-good: var(--status-good);
+  --color-fair: var(--status-fair);
+  --color-poor: var(--status-poor);
+  --color-bad: var(--status-bad);
+  --font-sans: system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+html {
+  background: var(--page);
+  color: var(--ink);
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Recharts chrome: recessive, hairline, muted — the data is the loud part. */
+.recharts-cartesian-axis-tick text {
+  fill: var(--muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+.recharts-cartesian-grid line {
+  stroke: var(--hairline);
+}

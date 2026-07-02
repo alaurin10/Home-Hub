@@ -1,0 +1,32 @@
+{
+  "name": "home-hub-dashboard",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "typecheck": "tsc --noEmit",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@dnd-kit/core": "^6.3.1",
+    "@dnd-kit/sortable": "^10.0.0",
+    "@dnd-kit/utilities": "^3.2.2",
+    "framer-motion": "^11.15.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.30.0",
+    "recharts": "^2.15.0",
+    "zustand": "^5.0.3"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.1.0",
+    "@types/react": "^18.3.18",
+    "@types/react-dom": "^18.3.5",
+    "@vitejs/plugin-react": "^4.3.4",
+    "tailwindcss": "^4.1.0",
+    "typescript": "~5.7.3",
+    "vite": "^6.0.7"
+  }
+}
