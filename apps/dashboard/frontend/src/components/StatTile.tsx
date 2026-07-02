@@ -16,7 +16,7 @@ export function StatTile({
   note?: string;
 }) {
   return (
-    <div className="rounded-2xl border border-hairline bg-surface p-4">
+    <div className="glass rounded-2xl p-4">
       <div className="text-xs font-medium text-muted">{label}</div>
       <div className="mt-1 text-2xl font-semibold text-ink">
         <NumberTicker value={value} digits={digits} />

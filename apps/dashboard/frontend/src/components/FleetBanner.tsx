@@ -19,10 +19,10 @@ export function FleetBanner() {
           className="mx-auto max-w-5xl px-5"
         >
           <div
-            className="mt-2 flex items-center gap-2.5 rounded-2xl border px-4 py-3 text-sm font-medium"
+            className="glass mt-2 flex items-center gap-2.5 rounded-2xl px-4 py-3 text-sm font-medium"
             style={{
               borderColor: "var(--status-bad)",
-              background: "color-mix(in srgb, var(--status-bad) 8%, var(--surface))",
+              background: "color-mix(in srgb, var(--status-bad) 12%, transparent)",
               color: "var(--ink)",
             }}
           >

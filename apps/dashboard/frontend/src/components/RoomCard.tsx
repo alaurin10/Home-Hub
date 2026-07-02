@@ -46,7 +46,7 @@ export function RoomCard({
         onClick={() => !editMode && navigate(`/room/${room.id}`)}
         whileHover={editMode ? undefined : { y: -2 }}
         whileTap={editMode ? undefined : { scale: 0.99 }}
-        className={`relative h-full cursor-pointer rounded-3xl border border-hairline bg-surface p-5 shadow-[0_1px_2px_rgba(0,0,0,0.03)] ${
+        className={`glass relative h-full cursor-pointer rounded-3xl p-5 transition-[filter] hover:brightness-[1.02] ${
           editMode ? "cursor-grab active:cursor-grabbing" : ""
         }`}
         {...(editMode ? listeners : {})}
@@ -67,7 +67,7 @@ export function RoomCard({
                 onToggleSize();
               }}
               onPointerDown={(e) => e.stopPropagation()}
-              className="rounded-full border border-hairline bg-surface-2 px-2.5 py-1 text-xs font-medium text-ink-2"
+              className="glass-chrome rounded-full px-2.5 py-1 text-xs font-medium text-ink-2"
             >
               {size === "wide" ? "⇥ Regular" : "⇤ Wide"}
             </button>

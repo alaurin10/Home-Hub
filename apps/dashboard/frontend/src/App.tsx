@@ -25,7 +25,7 @@ export default function App() {
   }, [ready]);
 
   return (
-    <div className="min-h-screen bg-page">
+    <div className="min-h-screen">
       <Header />
       <FleetBanner />
       <AnimatePresence mode="wait">

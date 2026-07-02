@@ -98,7 +98,7 @@ export function TrendChart({
           content={({ active, payload, label }) => {
             if (!active || !payload?.length) return null;
             return (
-              <div className="rounded-xl border border-hairline bg-surface px-3 py-2 text-xs shadow-sm">
+              <div className="glass-chrome rounded-xl px-3 py-2 text-xs">
                 <div className="mb-1 font-medium text-muted">{clockLabel(label as number, hours)}</div>
                 {payload
                   .filter((p) => !String(p.dataKey).endsWith("·band"))

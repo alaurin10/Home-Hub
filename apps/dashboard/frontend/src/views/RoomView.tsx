@@ -81,7 +81,7 @@ export function RoomView() {
           <div className="flex items-center gap-3">
             <Link
               to="/"
-              className="flex h-9 w-9 items-center justify-center rounded-full border border-hairline bg-surface text-ink-2 transition-colors hover:text-ink"
+              className="glass-chrome flex h-9 w-9 items-center justify-center rounded-full text-ink-2 transition-colors hover:text-ink"
               aria-label="Back to home"
             >
               ←
@@ -97,7 +97,7 @@ export function RoomView() {
         </div>
 
         {/* One filter row above the charts */}
-        <div className="mb-4 flex w-fit items-center gap-1 rounded-full border border-hairline bg-surface p-1">
+        <div className="glass-chrome mb-4 flex w-fit items-center gap-1 rounded-full p-1">
           {RANGES.map((r) => (
             <button
               key={r.label}
@@ -111,7 +111,7 @@ export function RoomView() {
           ))}
         </div>
 
-        <section className="rounded-3xl border border-hairline bg-surface p-5">
+        <section className="glass rounded-3xl p-5">
           <header className="mb-2 flex items-baseline justify-between">
             <h2 className="text-sm font-semibold text-ink">CO₂</h2>
             <div className="text-sm text-ink-2">
@@ -138,11 +138,11 @@ export function RoomView() {
         </section>
 
         <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
-          <section className="rounded-3xl border border-hairline bg-surface p-5">
+          <section className="glass rounded-3xl p-5">
             <h2 className="mb-2 text-sm font-semibold text-ink">Temperature</h2>
             {temp && <TrendChart series={[temp]} kind={kind} hours={hours} height={160} unit="°C" />}
           </section>
-          <section className="rounded-3xl border border-hairline bg-surface p-5">
+          <section className="glass rounded-3xl p-5">
             <h2 className="mb-2 text-sm font-semibold text-ink">Humidity</h2>
             {rh && <TrendChart series={[rh]} kind={kind} hours={hours} height={160} unit="%" />}
           </section>
@@ -161,7 +161,7 @@ export function RoomView() {
         </div>
 
         {pmSeries.length > 0 && (
-          <section className="mt-4 rounded-3xl border border-hairline bg-surface p-5">
+          <section className="mt-4 glass rounded-3xl p-5">
             <header className="mb-2 flex flex-wrap items-center justify-between gap-2">
               <h2 className="text-sm font-semibold text-ink">Particulate matter</h2>
               <LegendRow items={pmSeries.map((s) => ({ name: s.name, color: s.color }))} />
@@ -171,7 +171,7 @@ export function RoomView() {
         )}
 
         {(voc || nox) && (
-          <section className="mt-4 rounded-3xl border border-hairline bg-surface p-5">
+          <section className="mt-4 glass rounded-3xl p-5">
             <header className="mb-2 flex flex-wrap items-center justify-between gap-2">
               <h2 className="text-sm font-semibold text-ink">Gas indices</h2>
               <LegendRow

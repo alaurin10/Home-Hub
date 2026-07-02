@@ -24,10 +24,8 @@ export function NodeCard({ room }: { room: RoomSnapshot }) {
   const online = room.node.online;
   return (
     <article
-      className="rounded-3xl border bg-surface p-5"
-      style={{
-        borderColor: online ? "var(--hairline)" : "var(--status-bad)",
-      }}
+      className="glass rounded-3xl p-5"
+      style={online ? undefined : { borderColor: "var(--status-bad)" }}
     >
       <header className="flex items-center justify-between">
         <h3 className="text-sm font-semibold text-ink">{room.name}</h3>

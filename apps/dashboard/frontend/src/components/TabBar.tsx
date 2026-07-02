@@ -1,10 +1,10 @@
 import { NavLink } from "react-router-dom";
 
-/** Bottom navigation on phones; hidden on >=md where the header nav shows. */
+/** Floating glass pill tab bar (iOS 26 style) on phones; hidden on >=md. */
 export function TabBar() {
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-hairline bg-surface/90 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden">
-      <div className="mx-auto flex max-w-md">
+    <nav className="fixed inset-x-0 bottom-[max(1rem,env(safe-area-inset-bottom))] z-20 flex justify-center md:hidden">
+      <div className="glass-chrome flex w-64 rounded-full px-2 py-1">
         {[
           { to: "/", label: "Home", icon: "⌂" },
           { to: "/system", label: "System", icon: "◎" },
@@ -13,8 +13,8 @@ export function TabBar() {
             key={tab.to}
             to={tab.to}
             className={({ isActive }) =>
-              `flex flex-1 flex-col items-center gap-0.5 py-2.5 text-xs font-medium ${
-                isActive ? "text-ink" : "text-muted"
+              `m-0.5 flex flex-1 flex-col items-center gap-0.5 rounded-full py-2 text-xs font-medium transition-colors ${
+                isActive ? "bg-ink text-surface" : "text-muted"
               }`
             }
           >

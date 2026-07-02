@@ -56,11 +56,104 @@
   --font-sans: system-ui, -apple-system, "Segoe UI", sans-serif;
 }
 
+/* Ambient color field — Liquid Glass needs something soft to refract.
+   Low-saturation blue/teal + faint warm blobs; richer in dark mode. */
 html {
   background: var(--page);
   color: var(--ink);
   font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
   -webkit-font-smoothing: antialiased;
+  min-height: 100%;
+}
+
+body {
+  min-height: 100vh;
+  background:
+    radial-gradient(ellipse 60% 50% at 10% -8%, color-mix(in srgb, #2a78d6 32%, transparent), transparent 68%),
+    radial-gradient(ellipse 55% 48% at 95% 6%, color-mix(in srgb, #1baf7a 24%, transparent), transparent 68%),
+    radial-gradient(ellipse 70% 55% at 45% 112%, color-mix(in srgb, #eda100 20%, transparent), transparent 70%),
+    radial-gradient(ellipse 45% 40% at 70% 55%, color-mix(in srgb, #4a3aa7 12%, transparent), transparent 70%),
+    var(--page);
+  background-attachment: fixed;
+}
+
+@media (prefers-color-scheme: dark) {
+  body {
+    background:
+      radial-gradient(ellipse 60% 52% at 10% -8%, color-mix(in srgb, #3987e5 38%, transparent), transparent 68%),
+      radial-gradient(ellipse 55% 48% at 95% 6%, color-mix(in srgb, #199e70 26%, transparent), transparent 68%),
+      radial-gradient(ellipse 70% 58% at 45% 115%, color-mix(in srgb, #9085e9 24%, transparent), transparent 70%),
+      radial-gradient(ellipse 45% 42% at 70% 55%, color-mix(in srgb, #d55181 10%, transparent), transparent 70%),
+      var(--page);
+    background-attachment: fixed;
+  }
+}
+
+/* --- Liquid Glass materials -------------------------------------------
+   .glass        content cards (rooms, charts, tiles)
+   .glass-chrome floating controls (nav pills, tab bar, segmented filters)
+   Specular edge = inset top highlight + faint inset bottom shade; the
+   brighter top edge is what sells glass, especially on dark. */
+.glass {
+  background: color-mix(in srgb, var(--surface) 62%, transparent);
+  -webkit-backdrop-filter: blur(24px) saturate(160%);
+  backdrop-filter: blur(24px) saturate(160%);
+  border: 1px solid var(--glass-edge);
+  box-shadow:
+    inset 0 1px 0 0 var(--glass-specular),
+    inset 0 -1px 0 0 var(--glass-shade),
+    0 8px 24px -12px rgba(0, 0, 0, 0.18);
+}
+
+.glass-chrome {
+  background: color-mix(in srgb, var(--surface) 55%, transparent);
+  -webkit-backdrop-filter: blur(32px) saturate(180%);
+  backdrop-filter: blur(32px) saturate(180%);
+  border: 1px solid var(--glass-edge);
+  box-shadow:
+    inset 0 1px 0 0 var(--glass-specular),
+    0 6px 20px -10px rgba(0, 0, 0, 0.22);
+}
+
+:root {
+  --glass-edge: rgba(255, 255, 255, 0.45);
+  --glass-specular: rgba(255, 255, 255, 0.75);
+  --glass-shade: rgba(11, 11, 11, 0.04);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --glass-edge: rgba(255, 255, 255, 0.09);
+    --glass-specular: rgba(255, 255, 255, 0.14);
+    --glass-shade: rgba(0, 0, 0, 0.25);
+  }
+  .glass {
+    background: color-mix(in srgb, var(--surface) 55%, transparent);
+    box-shadow:
+      inset 0 1px 0 0 var(--glass-specular),
+      inset 0 -1px 0 0 var(--glass-shade),
+      0 10px 28px -12px rgba(0, 0, 0, 0.5);
+  }
+  .glass-chrome {
+    background: color-mix(in srgb, var(--surface) 48%, transparent);
+  }
+}
+
+/* Solid fallbacks: no backdrop-filter support, or the user asked for
+   reduced transparency. */
+@supports not (backdrop-filter: blur(1px)) {
+  .glass,
+  .glass-chrome {
+    background: var(--surface);
+  }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .glass,
+  .glass-chrome {
+    background: var(--surface);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
 }
 
 /* Recharts chrome: recessive, hairline, muted — the data is the loud part. */
