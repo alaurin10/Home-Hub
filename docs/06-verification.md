@@ -36,6 +36,10 @@
 - [ ] **Bind a Zigbee remote directly to the bulb** → press with HA Core stopped →
       bulb still toggles.
 - [ ] Reboot host → Z2M reconnects via by-id without edits.
+- [ ] **Anonymous MQTT connect is refused** (`mosquitto_sub` with no credentials
+      fails — see `mosquitto/README.md` hardening).
+- [ ] With ACLs on, the `zigbee2mqtt` user **cannot** read/publish outside
+      `zigbee2mqtt/#`.
 
 ## Phase 6 — automations
 - [ ] Trigger each condition physically; confirm action + "last triggered" + Logbook.

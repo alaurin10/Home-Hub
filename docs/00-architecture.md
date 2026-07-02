@@ -31,8 +31,8 @@ hardware, future-proof radios).
 
 | Area | Decision | Why |
 |---|---|---|
-| Host platform | **HA OS in a Proxmox VM** on a new mini PC | Easy supported HA appliance (Supervisor/add-ons/backups) **plus** room for "a few extras" as isolated LXCs and painless growth + VM snapshots |
-| Host hardware | **N150/N305-class mini PC, 16–32 GB RAM, ~500 GB NVMe**, on a **UPS** | Only existing hardware is a HomePod, so we buy the host; sized for Proxmox + extras at medium scale |
+| Host platform | **HA OS in a Proxmox VM** on a mini PC | Easy supported HA appliance (Supervisor/add-ons/backups) **plus** room for "a few extras" as isolated LXCs and painless growth + VM snapshots |
+| Host hardware | **Reused HP EliteDesk 600 G3 Mini** (i5-7500T, 16 GB, 128 GB SSD), on a **UPS** | Supersedes the original buy-a-new-mini-PC rec (N150/N305-class) — a capable machine was already on hand; VM disks sized to fit 128 GB. See `proxmox/README.md` |
 | DIY device transport | **ESPHome native API** (encrypted WiFi) | No broker, auto-discovery, robust reconnect |
 | Lighting / low-power mesh | **Zigbee2MQTT + Mosquitto**, **HA Connect ZBT-2** coordinator | Best device support; survives HA restarts; config-as-code friendly; modern dual-chip radio for a 20–60 device mesh |
 | Thread/Matter | **Via the HomePod now**; dedicated HA Thread radio only later | One radio per protocol (multiprotocol-on-one-stick still unreliable in 2026) |
@@ -130,7 +130,7 @@ critical path.
 
 | Item | Phase | ~USD | Notes |
 |---|---|---|---|
-| N150/N305 mini PC (16–32 GB, ~500 GB NVMe) | 1 | $180–300 | Sized for Proxmox + HA OS VM + a few LXCs |
+| Host: **reused HP EliteDesk 600 G3 Mini** (i5-7500T, 16 GB, 128 GB) | 1 | $0 | Supersedes the buy rec (was: N150/N305, ~$180–300); see `proxmox/README.md` |
 | **UPS 350–600 VA** | 1 | $55–90 | **Strongly recommended** — protects DBs from unclean power loss; enables NUT graceful shutdown |
 | ESP32 dev board (WROOM-32 / S3) ×2 | 2 | $6–12 ea | Buy 2 (spare/dev) |
 | 1–2× ESP32-**C6** (Thread hedge) | 2 | $6–10 ea | Optional; keeps Thread door open |
@@ -620,11 +620,14 @@ changes"; **back up (and snapshot) before any update.**
   - **Kitchen (`esp-kitchen-air`) — full:** SCD41 (CO2/T/RH) + PMS7003 (PM1/2.5/10, UART) + SGP41 (VOC+NOx, I²C).
   - **Bedroom + Living — reduced:** SCD41 only.
   - Chose discrete PMS7003 + SGP41 over the all-in-one SEN5x (~$40–50) for the same metrics at lower cost. BOM: `docs/03-bill-of-materials.md`.
-  - **DESIGN WORK STILL REQUIRED — not yet built.** The shipped design only covers the SCD4x node (`common/sensors_common.yaml`, `esp-office-air.yaml`). The new sensors need their own design before flashing:
-    - NEW reusable module `esphome/common/sensors_air_full.yaml` = a `sgp4x` block (VOC+NOx index) + a `pmsx003` block (`type: PMS7003`, PM1/2.5/10). Keep `sensors_common.yaml` as the SCD41-only block.
-    - `esp-kitchen-air.yaml` (new) includes both modules and adds a `uart:` bus (e.g. GPIO16/17) alongside `i2c:` (SCD41 `0x62` + SGP41 `0x59`, no conflict; PMS7003 on UART).
-    - `esp-bedroom-air.yaml` / `esp-living-air.yaml` (new) reuse `sensors_common.yaml` (SCD41) unchanged.
-    - Extend `packages/influxdb.yaml` + `packages/homekit.yaml` allowlists and `dashboards/air-quality.yaml` for the new PM2.5 / VOC / NOx entities. See the device registry in `docs/01-naming-conventions.md`.
+  - **BUILT.** `esphome/common/sensors_air_full.yaml` = `sgp4x` (VOC+NOx index) +
+    `pmsx003` (`type: PMSX003` — the generic ESPHome type that covers the PMS7003).
+    `esp-kitchen-air.yaml` includes both modules plus a `uart:` bus (GPIO16/17);
+    bedroom/living reuse `sensors_common.yaml` (SCD41) unchanged. Shared board +
+    I²C bus config (SCD41 `0x62` + SGP41 `0x59`, no conflict) lives in
+    `esphome/common/device_esp32.yaml`. InfluxDB/HomeKit allowlists and
+    `dashboards/air-quality.yaml` carry the PM2.5 / VOC / NOx entities; CI's
+    entity-drift check (`scripts/check-entity-drift.py`) keeps them honest.
 - **HA OS VM creation method:** community Proxmox helper-script vs official VM image. *Rec:* whichever is current/most-maintained at build time.
 - **Off-site backup target:** Google Drive add-on (rec) vs NAS/B2.
 - **Zigbee channel** selection vs your WiFi channels (decide before mass pairing).

@@ -39,10 +39,14 @@ Document the names here so nothing is forgotten:
 | Secret name | Contents |
 |---|---|
 | `HA_TOKEN` | Long-lived HA token (Settings → Profile → Long-Lived Access Tokens) |
-| `HA_URL` | Internal HA URL, e.g. `http://192.168.1.50:8123` |
-| `ESP_WIFI_PASSWORD` | WiFi password for the IoT VLAN |
-| `ESP_OTA_PASSWORD` | Per-node OTA password (set in `esphome/secrets.yaml`) |
-| `ESP_API_KEY` | ESPHome encryption key |
+| `HA_BASE_URL` | Internal HA URL, e.g. `http://192.168.1.50:8123` |
+| `ESPHOME_OTA_PASSWORD` | Fleet OTA password (matches `ota_password` in `esphome/secrets.yaml`) |
+
+These names must match what `deploy.yml`, `scripts/deploy-esphome.sh`, and
+`scripts/reload-ha.sh` read (`.env.example` mirrors them). WiFi credentials and
+the ESPHome API encryption key are NOT GitHub secrets — they live in
+`esphome/secrets.yaml` provisioned directly on the self-hosted runner, and the
+deploy script refuses to flash if that file still holds the dummy example values.
 
 ## 3. Repository variable (deploy gate)
 
