@@ -35,6 +35,7 @@ Assistant's `/config` directory, so this repo *is* the configuration.
 | `packages/` | DRY, modular HA config (recorder, influxdb, homekit, monitoring, notifications) |
 | `esphome/` | ESP device firmware configs; `common/base.yaml` is the shared DRY base |
 | `dashboards/` | Lovelace dashboards (YAML) |
+| `apps/dashboard/` | Custom dashboard app (FastAPI + React) — runs on the Docker VM, demo mode standalone |
 | `zigbee2mqtt/`, `mosquitto/`, `grafana/`, `influxdb/` | Mirrored add-on configs (authored parts only; runtime state is backup-only) |
 | `proxmox/` | Host notes: VM specs, USB passthrough, snapshot policy |
 | `.github/workflows/` | CI validation gate + (Phase 8) self-hosted OTA deploy |

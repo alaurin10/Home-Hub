@@ -188,3 +188,7 @@ exists (see §18 backlog for details — no new design work needed):
 Worst case adds ~1.5 GB RAM across four LXCs against ~6 GB free. Items 1–3
 deliver the most safety per hour of effort; 4–6 are quality-of-life; 7–9
 complete the story.
+
+**Related:** the custom dashboard app (`apps/dashboard/`, July 2026) deploys as
+a compose stack when the Docker host VM lands — it's a `ha.`/`dash.` hostname
+candidate for N2 and an HTTP monitor candidate for M1.
