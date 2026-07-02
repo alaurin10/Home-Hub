@@ -412,6 +412,16 @@ hosting wins on **retention + privacy**, and there's **no custom app to build**.
 - **Grafana:** deep-history charts off InfluxDB; **embeddable into HA dashboards**.
 - **Wall tablet** in kiosk mode for an always-on panel; start with HA-native
   history/LTS cards and lean on Grafana as data grows.
+- **Custom dashboard app (`apps/dashboard/`)** — *supersedes the "no custom app
+  to build" line above*: a FastAPI + React app (added July 2026) that complements,
+  not replaces, Lovelace/Grafana. Live view via HA's WS API, short history via
+  REST, long history via HA long-term statistics; drag-and-drop layout persisted
+  server-side; first-class demo mode (runs before any hardware exists). Ships as
+  a compose stack on the **Docker host VM**, reached via the same
+  Tailscale/Cloudflare Access posture (HA token server-side, no app auth, no
+  inbound ports). **Monorepo exception**: it lives in this repo rather than a
+  separate one because it shares the entity registry (§7), `config.yaml` mirrors
+  `packages/`, and it rides this repo's CI (`app-ci.yml`).
 
 **Reach them from any device, anywhere → Cloudflare Tunnel + Access** (reuses the
 Cloudflare account you already have):

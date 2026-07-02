@@ -21,3 +21,5 @@ rules:
 ignore: |
   .esphome/
   .storage/
+  apps/dashboard/frontend/node_modules/
+  apps/dashboard/backend/.venv/

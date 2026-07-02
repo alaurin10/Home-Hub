@@ -1,0 +1,53 @@
+name: app-ci
+
+# CI for the dashboard app (apps/dashboard/): frontend typecheck + build,
+# backend simulator/API tests. Path-filtered so HA/ESPHome-only changes
+# never pay for a node/python setup.
+
+on:
+  pull_request:
+    paths: ['apps/dashboard/**', '.github/workflows/app-ci.yml']
+  push:
+    branches: [main]
+    paths: ['apps/dashboard/**', '.github/workflows/app-ci.yml']
+
+jobs:
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/dashboard/frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/dashboard/frontend/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Typecheck + build
+        run: npm run build
+
+  backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/dashboard/backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: apps/dashboard/backend/requirements.txt
+
+      - name: Install
+        run: pip install -r requirements.txt pytest
+
+      - name: pytest
+        run: python -m pytest tests -q

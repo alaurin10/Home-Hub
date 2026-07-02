@@ -35,12 +35,15 @@ If a disk-hungry service (e.g. a Frigate NVR) is added, revisit a 500 GB SSD upg
 ## VM: Docker host
 
 - Debian 12 VM running **Docker Engine + Compose**. Hosts containerized apps as **separate
-  `docker compose` stacks**: the migrated **garmin-mcp** (+ future MCP servers) and the custom
-  **Garmin insights dashboard** (FastAPI + React + sync job + DB).
+  `docker compose` stacks**: the migrated **garmin-mcp** (+ future MCP servers), the custom
+  **Garmin insights dashboard** (FastAPI + React + sync job + DB), and the
+  **Home-Hub dashboard** (`apps/dashboard/` in this repo — FastAPI + React air-quality UI).
 - **Docker in a VM, not an LXC** — full kernel isolation; the supportable path. (Proxmox
   doesn't support Docker-in-LXC; nesting weakens isolation and breaks on kernel/systemd updates.)
 - App code lives in **separate repos** cloned onto this VM — **not** in this repo (which maps to
   HA's `/config`). Synced **health data is gitignored**.
+  **Exception:** the Home-Hub dashboard lives in this repo at `apps/dashboard/` (it shares the
+  entity registry and CI) — the VM clones/pulls home-hub and runs `docker compose up -d` there.
 - Give it a **static IP**. The garmin-mcp is reached via the existing **Cloudflare Tunnel**
   (a `cloudflared` container/route points here) — no inbound ports opened.
 

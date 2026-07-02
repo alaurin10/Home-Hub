@@ -29,5 +29,11 @@ backups/
 .esphome/
 *.bin
 
+# --- apps/ (dashboard) build & runtime state ---
+node_modules/
+apps/dashboard/frontend/dist/
+apps/dashboard/backend/.venv/
+apps/dashboard/data/
+
 # --- OS noise ---
 .DS_Store
