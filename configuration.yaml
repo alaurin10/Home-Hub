@@ -19,3 +19,21 @@ http:
 automation: !include automations.yaml
 script: !include scripts.yaml
 scene: !include scenes.yaml
+
+# Git-tracked YAML dashboards (dashboards/). The default dashboard stays
+# UI-managed (storage mode); these two are read-only views of the repo files.
+lovelace:
+  mode: storage
+  dashboards:
+    home-overview:
+      mode: yaml
+      title: Home Overview
+      icon: mdi:home
+      filename: dashboards/overview.yaml
+      show_in_sidebar: true
+    air-quality:
+      mode: yaml
+      title: Air Quality
+      icon: mdi:weather-windy
+      filename: dashboards/air-quality.yaml
+      show_in_sidebar: true

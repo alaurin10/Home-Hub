@@ -5,14 +5,19 @@ See `docs/02-bootstrap-proxmox-haos.md` §A for detailed purchasing notes and so
 
 ## Phase 1 — host + power
 
+> **Host settled — nothing to buy.** The original recommendation was a new
+> Beelink EQ12 Pro (N305) / Trigkey N150; instead a **reused HP EliteDesk 600
+> G3 Mini** (i5-7500T, 16 GB, 128 GB SSD) became available and is the Proxmox
+> host (`proxmox/README.md`). VM disk sizes in `docs/02` were trimmed to fit
+> the 128 GB drive. Only the UPS remains on the Phase 1 list.
+
 | Item | Best price | Source | Notes |
 |---|---|---|---|
-| **Beelink EQ12 Pro** (N305, 16 GB, 500 GB NVMe) | ~$179 | Amazon B0CCXZMZWL | Dual 2.5 GbE; recommended pick |
-| Alt: Trigkey Key N150 (16 GB, 500 GB) | ~$139–149 | Amazon | Budget pick if $179 is too much |
+| Host: **reused HP EliteDesk 600 G3 Mini** | $0 | on hand | i5-7500T, 16 GB, 128 GB SSD |
 | **CyberPower CP550SLG** UPS 550 VA | ~$55–65 | Amazon / Newegg | User-replaceable battery; recommended |
 | Alt: APC BE425M 425 VA | ~$35–45 | Amazon / Walmart | Non-replaceable battery; cheaper |
 
-**Phase 1 total: ~$214–244**
+**Phase 1 total: ~$35–65** (UPS only)
 
 ## Phase 2 / 6 — air-quality sensor nodes (3 rooms)
 

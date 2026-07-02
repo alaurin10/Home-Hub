@@ -8,6 +8,11 @@
 
 ## A. Hardware to buy
 
+> **SUPERSEDED (host):** the mini-PC purchase below never happened — the
+> Proxmox host is a **reused HP EliteDesk 600 G3 Mini** (i5-7500T, 16 GB,
+> 128 GB SSD); see `proxmox/README.md` and §B2 below, which is written for it.
+> The UPS advice still applies. Kept for reference if the host is ever replaced.
+
 ### Primary hardware (Phase 1)
 
 #### Mini PC — the Proxmox host

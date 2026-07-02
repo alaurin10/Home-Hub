@@ -1,5 +1,5 @@
-# Lovelace dashboard (YAML-mode example). Start in UI mode; when ready, set
-#   lovelace: { mode: yaml, dashboards: ... }   and register this file.
+# Lovelace dashboard (YAML mode) — registered in configuration.yaml under
+# lovelace: dashboards: home-overview. Edit here (git), not in the UI.
 title: Home Overview
 views:
   - title: Overview

@@ -3,13 +3,14 @@
 # (SCD41), which provides the temperature/humidity used for SGP41 compensation:
 #
 #   packages:
-#     base: !include common/base.yaml
-#     air:  !include common/sensors_common.yaml      # SCD41 (provides T/RH ids)
-#     aqx:  !include common/sensors_air_full.yaml     # SGP41 + PMS7003
+#     device: !include common/device_esp32.yaml       # provides the i2c: bus
+#     base:   !include common/base.yaml
+#     air:    !include common/sensors_common.yaml     # SCD41 (provides T/RH ids)
+#     aqx:    !include common/sensors_air_full.yaml   # SGP41 + PMS7003
 #
-# The node MUST define BOTH:
-#   - an `i2c:` bus (SCD41 @ 0x62 + SGP41 @ 0x59 share it; no address conflict)
-#   - a `uart:` bus @ 9600 baud (PMS7003)
+# The i2c: bus comes from device_esp32.yaml (SCD41 @ 0x62 + SGP41 @ 0x59 share
+# it; no address conflict). The node MUST still define a `uart:` bus @ 9600
+# baud for the PMS7003 (node-local — only the kitchen has one).
 # Entity names are short; HA prepends the device friendly_name →
 # "Kitchen Air PM2.5" / entity_id sensor.kitchen_air_pm2_5.
 sensor:
@@ -29,11 +30,32 @@ sensor:
 
   # PMS7003 — laser particulate matter (PM1.0 / PM2.5 / PM10) over UART.
   # ESPHome covers the PMS7003 with the generic `PMSX003` type (same protocol).
+  # update_interval > 30s makes ESPHome sleep the fan/laser between reads and
+  # pre-spin 30s before sampling — a big laser-lifetime win on a 24/7 node.
+  # Median-of-3 (@ 120s ≈ 6 min settle) drops single-sample glitches without
+  # hiding real cooking spikes. VOC/NOx above stay unfiltered: SGP41 outputs
+  # are already internally-smoothed Sensirion gas indices.
   - platform: pmsx003
     type: PMSX003
+    update_interval: 120s
     pm_1_0:
       name: "PM1.0"
+      filters:
+        - median:
+            window_size: 3
+            send_every: 1
+            send_first_at: 1
     pm_2_5:
       name: "PM2.5"
+      filters:
+        - median:
+            window_size: 3
+            send_every: 1
+            send_first_at: 1
     pm_10_0:
       name: "PM10"
+      filters:
+        - median:
+            window_size: 3
+            send_every: 1
+            send_first_at: 1

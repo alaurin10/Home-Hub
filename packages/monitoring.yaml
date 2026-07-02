@@ -1,6 +1,6 @@
 # Health monitoring — stale sensors, low battery, disk, UPS. See §12.
-# Template sensors here; the alerting automations live in automations.yaml (or
-# graduate into a package) so we keep a single `automation:` source.
+# Template sensors AND their alerting automation live together here, so the
+# whole fleet-health story is one file.
 #
 # Fleet-scalable pattern: ONE list of air-node locations drives both sensors
 # below. Adding a node = adding its location to `nodes` in each template.
@@ -43,25 +43,37 @@ template:
           {% endfor %}
           {{ stale or ns.disconnected }}
 
-# --- Example alerting automation (add to automations.yaml when ready) ---
-# - alias: "Alert: air fleet problem"
-#   id: alert_air_fleet_problem
-#   trigger:
-#     - platform: state
-#       entity_id: binary_sensor.air_fleet_problem
-#       to: "on"
-#       for: "00:05:00"
-#   action:
-#     - service: notify.notify_group
-#       data:
-#         title: "Air sensor offline"
-#         message: >
-#           Air nodes stale or disconnected: {{ states('sensor.stale_air_nodes') }}
-#
+# Alert when the fleet-problem sensor stays on for 5 minutes. The persistent
+# notification always works (no phone required); the notify_group push runs
+# with continue_on_error until packages/notifications.yaml points at a real
+# Companion-app service instead of the placeholder.
+automation:
+  - alias: "Alert: air fleet problem"
+    id: alert_air_fleet_problem
+    trigger:
+      - platform: state
+        entity_id: binary_sensor.air_fleet_problem
+        to: "on"
+        for: "00:05:00"
+    action:
+      - service: persistent_notification.create
+        data:
+          notification_id: air_fleet_problem
+          title: "Air sensor offline"
+          message: >
+            Air nodes stale or disconnected: {{ states('sensor.stale_air_nodes') }}
+      - service: notify.notify_group
+        continue_on_error: true
+        data:
+          title: "Air sensor offline"
+          message: >
+            Air nodes stale or disconnected: {{ states('sensor.stale_air_nodes') }}
+
 # NOTE: every alert above flows THROUGH Home Assistant — if HA itself is down,
 # nothing fires. Close that loop in Phase 7 with an external dead-man's switch:
 # a Healthchecks.io ping automation, or an Uptime Kuma LXC on the Proxmox host
-# watching HA from outside the VM. See docs/08-audit-2026-06.md.
+# watching HA from outside the VM. See docs/09-roadmap.md (M1/M2) and
+# docs/08-audit-2026-06.md.
 #
 # NVMe free-space + UPS state: add via the System Monitor and NUT integrations
 # (UI config entries) in Phase 1/7, then alert on their entities here.

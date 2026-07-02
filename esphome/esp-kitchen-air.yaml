@@ -4,28 +4,14 @@ substitutions:
   node_name: esp-kitchen-air
   friendly_name: Kitchen Air
 
-esphome:
-  name: ${node_name}
-  friendly_name: ${friendly_name}
-
-esp32:
-  board: esp32dev
-  framework:
-    type: esp-idf
-
 packages:
+  device: !include common/device_esp32.yaml
   base: !include common/base.yaml
   air: !include common/sensors_common.yaml
   aqx: !include common/sensors_air_full.yaml
 
-# I²C bus shared by SCD41 (0x62) and SGP41 (0x59).
-i2c:
-  sda: GPIO21
-  scl: GPIO22
-  scan: true
-
 # UART for the PMS7003 (9600 baud). GPIO16/17 are free on the WROOM-32
-# (separate from the USB logging UART).
+# (separate from the USB logging UART). Node-local: only the kitchen has one.
 uart:
   rx_pin: GPIO16
   tx_pin: GPIO17

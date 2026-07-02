@@ -1,25 +1,41 @@
 # Reusable SCD4x air block (CO2 + temperature + humidity).
 # Works for SCD40 AND SCD41 (the scd4x platform auto-detects the variant).
-# Include from an air node alongside base.yaml:
+# Include from an air node alongside the device + base packages:
 #
 #   packages:
-#     base: !include common/base.yaml
-#     air:  !include common/sensors_common.yaml
+#     device: !include common/device_esp32.yaml   # provides the i2c: bus
+#     base:   !include common/base.yaml
+#     air:    !include common/sensors_common.yaml
 #
-# Requires the node to define an `i2c:` bus (SCD4x @ 0x62). Entity names are
-# short; the device `friendly_name` is prepended by HA → "Office Air CO2" /
+# The SCD4x sits at I²C 0x62 (bus comes from device_esp32.yaml). Entity names
+# are short; the device `friendly_name` is prepended by HA → "Office Air CO2" /
 # entity_id sensor.office_air_co2.
 #
 # The temperature/humidity `id:`s below are reused by sensors_air_full.yaml for
 # SGP41 VOC/NOx humidity compensation on full nodes; harmless on SCD41-only nodes.
 sensor:
   - platform: scd4x
+    # CO2 stays UNFILTERED on purpose: stale-node detection (packages/
+    # monitoring.yaml) and future "CO2 high → ventilate" automations want raw
+    # readings, and the SCD4x already conditions its CO2 signal internally.
     co2:
       name: "CO2"
+    # T/RH get light smoothing (3 samples @ 60s ≈ 3 min) — kills SCD4x RH
+    # jitter without hiding real trends; comfort templates read these too.
     temperature:
       name: "Temperature"
       id: scd4x_temperature
+      filters:
+        - sliding_window_moving_average:
+            window_size: 3
+            send_every: 1
+            send_first_at: 1
     humidity:
       name: "Humidity"
       id: scd4x_humidity
+      filters:
+        - sliding_window_moving_average:
+            window_size: 3
+            send_every: 1
+            send_first_at: 1
     update_interval: 60s
