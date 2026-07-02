@@ -96,22 +96,36 @@ export function RoomView() {
           )}
         </div>
 
-        {/* One filter row above the charts */}
+        {/* One filter row above the charts; the active pill slides on a spring */}
         <div className="glass-chrome mb-4 flex w-fit items-center gap-1 rounded-full p-1">
           {RANGES.map((r) => (
             <button
               key={r.label}
               onClick={() => setHours(r.hours)}
-              className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
-                hours === r.hours ? "bg-ink text-surface" : "text-muted hover:text-ink-2"
-              }`}
+              className="relative rounded-full px-3 py-1 text-xs font-medium"
             >
-              {r.label}
+              {hours === r.hours && (
+                <motion.span
+                  layoutId="range-pill"
+                  transition={{ type: "spring", stiffness: 420, damping: 34 }}
+                  className="absolute inset-0 rounded-full bg-ink"
+                />
+              )}
+              <span
+                className={`relative transition-colors duration-200 ${
+                  hours === r.hours ? "text-surface" : "text-muted hover:text-ink-2"
+                }`}
+              >
+                {r.label}
+              </span>
             </button>
           ))}
         </div>
 
-        <section className="glass rounded-3xl p-5">
+        {/* layoutId matches the Home room card → the card morphs into this
+            hero section when navigating (falls back to the page transition
+            where the browser can't run it). */}
+        <motion.section layoutId={`room-${id}`} className="glass rounded-3xl p-5">
           <header className="mb-2 flex items-baseline justify-between">
             <h2 className="text-sm font-semibold text-ink">CO₂</h2>
             <div className="text-sm text-ink-2">
@@ -135,7 +149,7 @@ export function RoomView() {
               guides={config.thresholds.co2.bounds.slice(0, 2)}
             />
           )}
-        </section>
+        </motion.section>
 
         <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
           <section className="glass rounded-3xl p-5">
