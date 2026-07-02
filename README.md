@@ -24,6 +24,8 @@ Assistant's `/config` directory, so this repo *is* the configuration.
 - **[`docs/06-verification.md`](docs/06-verification.md)** — how each phase is verified.
 - **[`docs/08-audit-2026-06.md`](docs/08-audit-2026-06.md)** — June 2026 project
   audit: findings, hardening checklist, and the prioritized feature backlog.
+- **[`docs/09-roadmap.md`](docs/09-roadmap.md)** — infra roadmap: network
+  services (DNS, reverse proxy, Tailscale) + monitoring that watches the watcher.
 
 ## Repository layout
 

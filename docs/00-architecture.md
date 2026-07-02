@@ -648,6 +648,9 @@ changes"; **back up (and snapshot) before any update.**
 
 ## 18. Future features — backlog (post-Phase 8, prioritized)
 
+Device/automation features live here; the **infra-side roadmap** (network
+services + monitoring on the Proxmox host) is `docs/09-roadmap.md`.
+
 From the 2026-06 audit (`docs/08-audit-2026-06.md`). The naming registry
 (§7) already reserves the roles these need (`presence`, `power`, `leak`,
 `motion`) — adding them means new hardware + a registry entry, no renames.
