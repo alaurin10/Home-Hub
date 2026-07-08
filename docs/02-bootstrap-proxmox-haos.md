@@ -721,3 +721,4 @@ Take these **before any further configuration** — this is your safe rollback p
 - [ ] Proxmox snapshot taken per guest (`phase1-baseline-ha`, `-pihole`, `-docker`)
 - [ ] HA backup `phase1-baseline` downloaded off-server
 - [ ] (Optional) IoT VLAN configured with mDNS reflector
+# phase 1 smoke test
