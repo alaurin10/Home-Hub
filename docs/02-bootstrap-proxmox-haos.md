@@ -391,7 +391,37 @@ garmin-mcp and Garmin-dashboard repos here and bring each up with `docker compos
 > This section is router/firewall dependent. Common setups covered below.
 > If you skip this, mDNS/ESPHome discovery will silently fail across VLANs.
 
-### D1. What you need
+### D0. Router type — Which path to follow?
+
+**If you have an Xfinity gateway (xFi Gateway / XB6/XB7/XB8):**
+→ **Skip to D-Xfinity below.** These gateways do NOT support VLANs, custom firewall rules, or tagged networks. Standard VLAN setup doesn't apply.
+
+**If you have UniFi, OPNsense, pfSense, OpenWRT, or another router with VLAN support:**
+→ **Follow D1–D2 below** for the full isolated IoT network.
+
+### D-Xfinity: For Xfinity Gateway Users (No VLAN Support)
+
+The default Xfinity gateway (xFi Gateway) cannot do VLANs, custom firewall rules, or any of the D1–D2 setup.
+
+**Option 1: Keep everything on the flat network (Recommended for Xfinity users)**
+
+1. Your Proxmox host, HA VM, and ESP32 devices all share the same DHCP range (usually `10.0.0.x`, `192.168.0.x`, or `192.168.1.x`).
+2. No firewall rules needed — skip all of D1's rules.
+3. No Avahi reflector — mDNS discovery (ESPHome/HA zeroconf) works natively on a flat network.
+4. **Verify your network range:** Xfinity app → WiFi → your network → Connected Devices (shows you the DHCP range).
+
+**Trade-off:** No network isolation between IoT devices and other devices. For a homelab with DIY sensors, this is acceptable. If network isolation is critical, you'll need to replace your Xfinity gateway (see Option 2).
+
+**Option 2: Replace Xfinity gateway with a real router**
+
+Put Xfinity in **bridge mode** (Xfinity app → WiFi → [gateway] → Bridge Mode) to disable its router entirely, then install:
+- A UniFi Dream Machine/Router, or
+- An OPNsense/pfSense box, or
+- An OpenWRT router
+
+Then follow D1–D2 below. **Not recommended for most** — bridge mode removes Xfinity's WiFi and router entirely, requiring full reconfiguration.
+
+### D1. What you need (for VLAN-capable routers)
 
 - **IoT VLAN** (e.g., VLAN ID 20, subnet `192.168.20.0/24`)
 - **DHCP on IoT VLAN** (router serves addresses in the 192.168.20.x range)
@@ -401,6 +431,9 @@ garmin-mcp and Garmin-dashboard repos here and bring each up with `docker compos
   - HA → IoT: allow TCP 6053 (OTA), TCP 3232 (OTA alt), TCP 80 (ESPHome fallback)
   - IoT → Main LAN: **BLOCK** (ESP32 firmware isn't hardened)
   - Main LAN / Tailscale → HA: allow (for your devices)
+
+**Why mDNS reflection matters:**
+mDNS (used by ESPHome discovery) relies on multicast UDP 5353 on the local subnet. Routers don't forward multicast between VLANs by default, even if you open the port in the firewall. You need something actively relaying the multicast packets — that's Avahi in reflector mode (or your router's built-in mDNS feature, like UniFi's). Without it, auto-discovery silently fails.
 
 ### D2. VLAN setup by router type
 
@@ -446,81 +479,153 @@ Document your reservations here as you add devices:
 
 Install these via **Settings → Add-ons → Add-on Store** (search each by name).
 
+### General add-on installation flow
+
+Each add-on has a **Configuration** tab where you paste YAML directly (not individual toggles).
+
+1. **Settings** → **Add-ons** → **Add-on Store** → search by exact name
+2. **Install** button (wait for it to complete)
+3. **Configuration** tab → toggle to raw YAML mode if needed → **paste the config block** → **Save**
+4. **Info** tab → toggle **Start** on → optionally enable "Start on boot" and "Watchdog"
+5. **Log** tab → confirm no errors (look for "started" or "running")
+
+**Where to put your own values:**
+- Replace `"choose a strong password"` with an actual password you set
+- Replace `192.168.1.XX` with your actual HA IP (check Settings → System → Network in HA, or your router's device list)
+- Replace `YOUR_PASSWORD` with actual database passwords you created
+
 ### E1. Advanced SSH & Web Terminal
 
-1. Search "Advanced SSH & Web Terminal" (not the basic "Terminal & SSH").
-2. Install → Configuration tab:
-   ```yaml
-   username: hassio
-   password: "choose a strong password"
-   authorized_keys: []
-   sftp: false
-   compatibility_mode: false
-   allow_agent_forwarding: false
-   allow_remote_port_forwarding: false
-   allow_tcp_forwarding: false
-   ```
-3. Start → check logs (should show "SSH server started").
-4. Connect: `ssh hassio@192.168.1.XX -p 22222` (port 22222 by default).
+Gives you SSH access to the HA OS for advanced troubleshooting and CLI commands.
+
+**Installation:**
+1. Search **"Advanced SSH & Web Terminal"** (NOT the plain "Terminal & SSH")
+2. Install → Configuration tab
+
+**Configuration YAML:**
+```yaml
+username: hassio
+password: "pick-a-strong-password-here"
+authorized_keys: []
+sftp: false
+compatibility_mode: false
+allow_agent_forwarding: false
+allow_remote_port_forwarding: false
+allow_tcp_forwarding: false
+```
+
+3. Save → **Info** tab → **Start** → check **Log** tab for errors
+
+**Connect from your laptop:**
+```bash
+ssh hassio@10.0.0.188 -p 22
+```
+
+**Important:** This add-on defaults to **port 22** (not 22222). If you see "Connection refused":
+- Check the add-on's **Log** tab to confirm "SSH server started"
+- Ensure the add-on status shows "STARTED" (green dot)
+- Try stopping and restarting the add-on if the port binding failed
+- Use `-p 22` — the config defaults to port 22, not 22222
+
+**On first connection:** you'll see a host key fingerprint warning → type `yes` to accept.
 
 ### E2. Studio Code Server (in-browser editor)
 
-1. Search "Studio Code Server".
-2. Install → Configuration: set a `password`.
-3. Start → open via the "Open Web UI" button (access via Ingress = no extra port).
-4. This gives you VS Code in the browser for editing YAML files in `/config`.
+VS Code running in your browser for editing HA's YAML files.
+
+**Installation:**
+1. Search **"Studio Code Server"**
+2. Install → **Configuration** → set `password: "your-password"`
+3. Save → **Info** → **Start**
+4. Once running, click **"Open Web UI"** button (or Settings → Add-ons → Studio Code Server → "Open Web UI")
+
+You now have VS Code in your browser, already pointed at `/config`.
 
 ### E3. Tailscale
 
-1. Create a free account at `tailscale.com`.
-2. Search "Tailscale" in add-on store → Install.
-3. Configuration:
-   ```yaml
-   accept_dns: false
-   accept_routes: false
-   advertise_exit_node: false
-   funnel: false
-   log_level: warning
-   login_server: https://controlplane.tailscale.com
-   proxy: false
-   reset: false
-   stateful_filtering: false
-   tags: []
-   userspace_networking: false
-   ```
-4. Start → open add-on log → click the login URL to authorize the device.
-5. In the Tailscale admin panel (`login.tailscale.com/admin`):
-   - The HA device should appear. Assign it a memorable name: `home-hub-ha`.
-   - Note the Tailscale IP (100.x.x.x) — this is your permanent remote HA address.
-6. **Verify:** from your phone on cellular (WiFi off), open `http://100.x.x.x:8123` — HA loads.
+Remote access to HA from outside your home network (e.g., cellular) at a stable Tailscale IP (`100.x.x.x`).
+
+**Prerequisites:**
+- Free Tailscale account at https://tailscale.com
+
+**Installation:**
+1. Search **"Tailscale"**
+2. Install → **Configuration** tab
+
+**Configuration YAML:**
+```yaml
+accept_dns: false
+accept_routes: false
+advertise_exit_node: false
+funnel: false
+log_level: warning
+login_server: https://controlplane.tailscale.com
+proxy: false
+reset: false
+stateful_filtering: false
+tags: []
+userspace_networking: false
+```
+
+3. Save → **Info** → **Start**
+4. Go to the **Log** tab — you'll see a **login URL** printed there. **Click that URL** to authorize the device in Tailscale.
+
+**After authorization:**
+1. Open https://login.tailscale.com/admin (your Tailscale dashboard)
+2. Find the HA device in the list
+3. Edit its name to something memorable: `home-hub-ha`
+4. **Note the Tailscale IP** (format: `100.x.x.x`) — this is your permanent remote HA address
+
+**Verify remote access:**
+- Turn WiFi off on your phone (use cellular)
+- Open browser to `http://100.x.x.x:8123` (your Tailscale IP)
+- HA should load
 
 ### E4. MariaDB
 
-1. Search "MariaDB" → Install.
-2. Configuration tab:
-   ```yaml
-   databases:
-     - homeassistant
-   logins:
-     - username: homeassistant
-       password: "choose a strong DB password"
-   rights:
-     - username: homeassistant
-       host: "%"
-       database: homeassistant
-       grant: true
-   ```
-3. Start → check logs.
-4. Add the DB URL to your `secrets.yaml` (do this in Step F):
-   ```yaml
-   db_url: "mysql://homeassistant:YOUR_PASSWORD@core-mariadb/homeassistant?charset=utf8mb4"
-   ```
+Persistent database for HA recordings (history, statistics). Without this, HA only keeps a few days of data in memory.
 
-The `packages/recorder.yaml` in this repo already references `!secret db_url`,
-so once the secret is filled in, HA will use MariaDB automatically.
+**Installation:**
+1. Search **"MariaDB"**
+2. Install → **Configuration** tab
+
+**Configuration YAML:**
+```yaml
+databases:
+  - homeassistant
+logins:
+  - username: homeassistant
+    password: "pick-a-strong-db-password"
+rights:
+  - username: homeassistant
+    host: "%"
+    database: homeassistant
+    grant: true
+```
+
+3. Save → **Info** → **Start** → check **Log** tab for errors
+
+**Add the database connection to secrets (critical step):**
+
+1. SSH into HA or use Studio Code Server (E2)
+2. Edit `/config/secrets.yaml` (create it if it doesn't exist)
+3. Add this line:
+```yaml
+recorder_db_url: "mysql://homeassistant:YOUR_PASSWORD@core-mariadb/homeassistant?charset=utf8mb4"
+```
+
+Replace `YOUR_PASSWORD` with the MariaDB password you set above.
+
+**IMPORTANT:** The secret **must** be named `recorder_db_url` (not `db_url`). The `packages/recorder.yaml` in this repo references this exact name. If you get "Secret recorder_db_url not defined" error on restart, check that the secret name matches exactly.
+
+4. Restart HA (Settings → System → Restart → Quick reload)
+5. Verify: Settings → System → Database should show "MariaDB" (not SQLite)
 
 ### E5. NUT (Network UPS Tools) — after UPS is connected
 
+Only relevant if you have a UPS connected via USB. Skip this unless you physically plug in a UPS to the Proxmox host.
+
+**Installation:**
 1. Connect your CyberPower/APC UPS to the mini PC via USB.
 2. In Proxmox, you may need to pass the USB UPS device to the HA VM:
    - Datacenter → [Node] → [HA VM] → Hardware → Add → USB Device
@@ -703,6 +808,68 @@ Take these **before any further configuration** — this is your safe rollback p
 4. Download the `.tar` file to your laptop/cloud storage.
 
 > If anything goes wrong later, you can restore this snapshot in minutes.
+
+---
+
+## Editing Files in the HA Terminal
+
+If you SSH into HA and need to edit a file, you have three options:
+
+### Option 1: Use `nano` (easiest)
+```bash
+nano ~/.ssh/config
+# or
+nano /config/secrets.yaml
+```
+- Edit your text
+- Press `Ctrl+X` → `Y` → `Enter` to save
+
+### Option 2: Use `cat` with heredoc (no editor needed)
+```bash
+cat > ~/.ssh/config << 'EOF'
+Host github.com
+  IdentityFile /root/.ssh/ha_deploy_key
+  StrictHostKeyChecking accept-new
+EOF
+```
+- Paste your multi-line text between the delimiters
+- Type `EOF` on its own line to finish
+
+### Option 3: Avoid the terminal, use Studio Code Server (E2)
+- Already running in your browser
+- Much more user-friendly for editing files
+
+---
+
+## Troubleshooting
+
+### SSH Connection Refused (E1)
+- Check the add-on's **Log** tab for errors
+- Confirm the add-on status shows **"STARTED"** (green dot)
+- Try **Stop** → **Start** again to restart the SSH service
+- Try port **22** if the configured port doesn't work (this is the default)
+
+### Secret Not Defined Error (E4)
+- Error message: `Error loading /config/configuration.yaml: Secret recorder_db_url not defined`
+- Check that `/config/secrets.yaml` has the line `recorder_db_url: ...`
+- The secret **must** be named `recorder_db_url`, not `db_url`
+- After adding the secret, **restart HA** (Settings → System → Restart → Quick reload)
+
+### MariaDB Fails to Start (E4)
+- Check MariaDB add-on's **Log** tab for errors
+- Ensure you set a **password** in the Configuration (not an empty password)
+- Try **Stop**, wait 30 seconds, then **Start** again
+- Verify the password you used in the config matches what you put in `secrets.yaml`
+
+### Tailscale Stuck on Login (E3)
+- Check the **Log** tab — sometimes the login URL is printed multiple times
+- Click a fresh login URL from the logs
+- If already authorized, try **Stop** → **Start** to restart the add-on
+
+### HA Version Missing or Wrong in `settings.yaml`
+- Settings → System → About → note the version (e.g., `Home Assistant 2026.7.1`)
+- Extract major.minor (e.g., `2026.7`) and create/update `.ha-version` with just that line
+- Commit and push — CI will now validate against your exact version
 
 ---
 
