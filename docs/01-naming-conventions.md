@@ -6,8 +6,8 @@
 
 ## Tokens
 
-**Location** (closed list, lowercase):
-`office, bedroom, living, kitchen, bath, garage, hall, outdoor`
+**Location** (closed list, lowercase — scoped to a 3-room apartment):
+`bedroom, living, kitchen, bath, hall, outdoor`
 
 **Role** (closed list):
 `air, temp, motion, presence, contact, light, relay, env, power, leak`
@@ -31,14 +31,13 @@
   changes.
 - **Never** leave a Zigbee device on its `0x00124b…` default — rename at pairing.
 
-## Device registry (first 3 devices — named on paper)
+## Device registry (3-room apartment — named on paper)
 
 | # | Hostname | Area | Role | Sensor / HW | Example entities | Phase |
 |---|---|---|---|---|---|---|
-| 1 | `esp-office-air` | Office | air | ESP32 + SCD40 (I²C) | `sensor.office_air_co2`, `sensor.office_air_temperature`, `sensor.office_air_humidity` | 2 |
+| 1 | `esp-bedroom-air` | Bedroom | air | ESP32 + SCD41 (I²C) | `sensor.bedroom_air_co2`, `sensor.bedroom_air_temperature`, `sensor.bedroom_air_humidity` | 2 (first node) |
 | 2 | `esp-kitchen-air` | Kitchen | air | ESP32 + **SCD41 + PMS7003 + SGP41** | `sensor.kitchen_air_co2`, `…_temperature`, `…_humidity`, `…_pm2_5`, `…_voc`, `…_nox` | 2 |
 | 3 | `esp-living-air` | Living Room | air | ESP32 + SCD41 (I²C) | `sensor.living_air_co2`, `sensor.living_air_temperature`, `sensor.living_air_humidity` | 6 |
-| 4 | `esp-bedroom-air` | Bedroom | air | ESP32 + SCD41 (I²C) | `sensor.bedroom_air_co2`, `sensor.bedroom_air_temperature`, `sensor.bedroom_air_humidity` | 6 |
 
 > Each new node = a thin `esphome/esp-<location>-<role>.yaml` that includes
 > `common/base.yaml` (+ a sensor block) and sets `node_name` / `friendly_name`.
