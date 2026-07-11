@@ -14,10 +14,6 @@ influxdb:
     - friendly_name
   include:
     entities:
-      # Office (SCD40)
-      - sensor.office_air_co2
-      - sensor.office_air_temperature
-      - sensor.office_air_humidity
       # Kitchen (SCD41 + SGP41 + PMS7003) — full air quality
       - sensor.kitchen_air_co2
       - sensor.kitchen_air_temperature
