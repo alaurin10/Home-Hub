@@ -424,7 +424,11 @@ hosting wins on **retention + privacy**, and there's **no custom app to build**.
   `packages/`, and it rides this repo's CI (`app-ci.yml`).
 
 **Reach them from any device, anywhere → Cloudflare Tunnel + Access** (reuses the
-Cloudflare account you already have):
+Cloudflare account you already have). **Decided July 2026** after revisiting the
+alternatives (Pangolin on a VPS, port-forward reverse proxy, Tailscale Funnel,
+Grafana Cloud — rejected on cost/no-inbound-ports/no-custom-domain/off-prem-data
+respectively); dashboards-over-Tailscale is **superseded for viewing** — Tailscale
+keeps only admin/SSH + the Companion app. Runbook: `docs/10-remote-access.md`.
 - The **`cloudflared` HA add-on** opens an **outbound-only** tunnel to Cloudflare's
   edge — **no router ports opened, no public IP exposed** — publishing dashboards
   at e.g. `grafana.<yourdomain>` / `ha.<yourdomain>`.
@@ -454,8 +458,11 @@ Cloudflare account you already have):
   dashboard, and Access keeps strangers out — and it's *why the data stays local
   and only the view is proxied*.
 
-**Build order:** LAN + Tailscale work from Phase 1; add the Cloudflare Tunnel +
-Access once dashboards exist (Phase 7, or earlier if you want it sooner).
+**Build order:** LAN + Tailscale work from Phase 1; the Cloudflare Tunnel +
+Access step is **pulled forward** (July 2026) to land with the first Grafana
+dashboards instead of waiting for Phase 7 — follow `docs/10-remote-access.md`
+(harden Grafana add-on → cloudflared add-on → Access policies → verify on
+cellular).
 
 ---
 
@@ -646,13 +653,14 @@ changes"; **back up (and snapshot) before any update.**
   push-to-deploy.
 - **OTA rollout shape:** canary + batch size (default: 1 canary, then small batches)
   and the per-device health-check timeout.
-- **Dashboard domain:** which Cloudflare-managed domain/subdomains to use
-  (`grafana.<domain>`, `ha.<domain>`) — a subdomain of your existing app's domain is fine.
-- **Cloudflare Access identity:** Google SSO vs one-time-PIN email (*rec:* SSO if you
-  have a Google account, PIN as a simple start), and whether to also gate Grafana
-  with Access or rely on Grafana's own login.
-- **Companion-app remote path:** via Tailscale (*rec*) vs a Cloudflare Access service
-  token (advanced).
+- **Dashboard domain** — **DECIDED (July 2026):** subdomains of the existing
+  Cloudflare-managed domain (`grafana.<domain>`, `ha.<domain>`; `dash.<domain>`
+  later). Runbook: `docs/10-remote-access.md`.
+- **Cloudflare Access identity** — **DECIDED (July 2026):** Google SSO
+  (one-time-PIN email as fallback), and **both** layers: Access gate *and* the
+  app's own login (Grafana anonymous access off, viewer account for mobile).
+- **Companion-app remote path** — **DECIDED (July 2026):** Tailscale (Access
+  breaks the app's login flow; browsers are fine).
 
 ---
 
