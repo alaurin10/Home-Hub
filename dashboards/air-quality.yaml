@@ -1,6 +1,6 @@
 # Air-quality detail view. Pairs HA-native cards with an embedded Grafana panel
 # for deep history (Grafana is embeddable into HA dashboards — see §10).
-# Entities populate as each node is flashed (office=SCD40; kitchen=full;
+# Entities populate as each node is flashed (kitchen=full;
 # bedroom/living=SCD41). Per docs/01-naming-conventions.md.
 title: Air Quality
 views:
@@ -15,7 +15,6 @@ views:
           - min
           - max
         entities:
-          - sensor.office_air_co2
           - sensor.kitchen_air_co2
           - sensor.bedroom_air_co2
           - sensor.living_air_co2
@@ -23,15 +22,6 @@ views:
       # --- CO2 gauges per room ---
       - type: horizontal-stack
         cards:
-          - type: gauge
-            name: Office CO2
-            entity: sensor.office_air_co2
-            min: 400
-            max: 2000
-            severity:
-              green: 400
-              yellow: 1000
-              red: 1500
           - type: gauge
             name: Kitchen CO2
             entity: sensor.kitchen_air_co2
