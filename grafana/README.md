@@ -6,6 +6,10 @@ provisioning files (`provisioning/`) and the add-on options recorded here.
 Dashboards built in the UI, users, and sessions are runtime state → Supervisor
 backup, never git. See docs/00 §8 and docs/10-remote-access.md.
 
+**Installing it:** the app ships in HA's default catalog, no repository add
+needed — search "Grafana" under Settings → Apps → App Store. Full install
+walkthrough: `docs/02-bootstrap-proxmox-haos.md` §E7.
+
 ## Add-on options (Configuration tab)
 
 | Option | Value | Why |

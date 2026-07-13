@@ -477,13 +477,21 @@ Document your reservations here as you add devices:
 
 ## E. Core add-ons
 
-Install these via **Settings → Add-ons → Add-on Store** (search each by name).
+Install these via **Settings → Apps → App Store** (search each by name).
+
+> **Naming note (HA 2026.2+):** Home Assistant renamed "Add-ons" to "Apps"
+> across the UI — Settings → Add-ons is now **Settings → Apps**, the
+> "Add-on Store" is now the **App Store**, and the Supervisor panel is folded
+> into the main frontend (same underlying mechanism, just relabeled and
+> faster). Third-party add-on/app documentation you find online — including
+> most of the pages linked from this doc — still says "add-on"; that's the
+> same thing. If your HA predates 2026.2, use "Add-ons"/"Add-on Store" instead.
 
 ### General add-on installation flow
 
 Each add-on has a **Configuration** tab where you paste YAML directly (not individual toggles).
 
-1. **Settings** → **Add-ons** → **Add-on Store** → search by exact name
+1. **Settings** → **Apps** → **App Store** → search by exact name
 2. **Install** button (wait for it to complete)
 3. **Configuration** tab → toggle to raw YAML mode if needed → **paste the config block** → **Save**
 4. **Info** tab → toggle **Start** on → optionally enable "Start on boot" and "Watchdog"
@@ -493,6 +501,20 @@ Each add-on has a **Configuration** tab where you paste YAML directly (not indiv
 - Replace `"choose a strong password"` with an actual password you set
 - Replace `192.168.1.XX` with your actual HA IP (check Settings → System → Network in HA, or your router's device list)
 - Replace `YOUR_PASSWORD` with actual database passwords you created
+
+### Adding a third-party repository (needed for E6 and E8 below)
+
+Some apps (InfluxDB 2.x, Cloudflared) don't ship in HA's default catalog and
+need their repository added once, first:
+
+1. **Settings** → **Apps** → **App Store**
+2. **⋮** (three-dot menu, top-right of the store page) → **Repositories**
+3. Paste the repository URL → **Add** → close the dialog
+4. The app(s) from that repository now show up in the store's search/list —
+   proceed with the normal install flow above.
+
+(This is unchanged from the pre-2026.2 "Add-on Store" flow — only the
+surrounding labels moved.)
 
 ### E1. Advanced SSH & Web Terminal
 
@@ -648,6 +670,95 @@ Only relevant if you have a UPS connected via USB. Skip this unless you physical
 
 **Test graceful shutdown (Phase 7):** once everything is stable, unplug UPS power and
 verify HA shuts down cleanly before the battery runs out.
+
+### E6. InfluxDB 2.x
+
+The InfluxDB app you'll find pre-installed in HA's default catalog
+(`hassio-addons`' "InfluxDB") is **version 1.x** — it bundles Chronograf/
+Kapacitor and uses a `database:`-based config with no orgs/buckets/Flux. This
+repo's `packages/influxdb.yaml` is written for **InfluxDB 2.x**
+(`api_version: 2`, `organization`, `bucket`, Flux) — that's a *different* app
+from a different, third-party repository. Installing the default one will not
+work with this repo's config.
+
+**Installation:**
+1. Add the repository first (see "Adding a third-party repository" above):
+   `https://github.com/Dattel/homeassistant-influxdb2`
+2. Search **"InfluxDB2"** (not "InfluxDB") → **Install**
+3. **Info** tab → **Start**. On first run it serves a **setup wizard** on its
+   web UI (Info tab → "Open Web UI") asking for a username, password,
+   organization name, and bucket name — use:
+   - Organization: `home`
+   - Bucket: `home_assistant`
+4. Finish the wizard, then in the InfluxDB UI create the two tokens this
+   project expects (`influxdb/README.md`):
+   - A **write** token for HA.
+   - A **read-only** token for Grafana.
+
+**Add the write token to secrets:**
+```yaml
+# secrets.yaml
+influxdb_token: "paste-the-write-token-here"
+```
+
+**Find its real hostname (don't guess):**
+
+Every add-on's internal Docker hostname is `<hash>-<slug>`, where the hash is
+derived from *which repository it came from*. Add-ons from the pre-added
+Home Assistant Community Add-ons repo (Grafana, NUT, etc.) happen to share one
+hash; InfluxDB2 comes from Dattel's separate repository, so it gets a
+**different** hash — there is no fixed value to hardcode. After installing:
+1. Open the InfluxDB2 add-on's **Info** tab.
+2. Note its hostname (shown there, format `<hash>-influxdb2` or similar) and
+   its exposed port.
+3. Put that exact value into `packages/influxdb.yaml`'s `host:` field (replacing
+   the placeholder) and into `grafana/provisioning/datasources/influxdb.yaml.example`'s
+   `url:` field once you copy it into the Grafana add-on's provisioning path (E7).
+
+**Verify:** restart HA, then in the InfluxDB2 UI → Data Explorer → bucket
+`home_assistant` should show incoming points within a minute or two of the
+allowlisted sensors updating.
+
+**If this add-on gives you trouble:** it's a small, third-party maintained
+project (not the official Home Assistant Community Add-ons team). A fallback
+is running InfluxDB 2.x yourself via docker-compose on the Docker host VM
+(same one planned for `apps/dashboard/`) instead of as an HA add-on — bigger
+change, only worth it if the add-on proves unreliable.
+
+### E7. Grafana
+
+Unlike InfluxDB2, this one **is** in the default catalog — no repository add
+needed.
+
+**Installation:**
+1. Search **"Grafana"** → **Install**.
+2. Before doing anything else: open its web UI and **change the default
+   `admin` / `hassio` login**.
+3. Apply the hardening in `grafana/README.md` (`env_vars` for
+   `GF_AUTH_ANONYMOUS_ENABLED: "false"`, `GF_USERS_ALLOW_SIGN_UP: "false"`;
+   expose host port 3000 under Network) via the **Configuration** tab.
+4. Copy `grafana/provisioning/datasources/influxdb.yaml.example` into the
+   add-on's provisioning directory (its Info/Documentation tab shows the
+   mounted path, typically under `/share/grafana/provisioning/datasources/`),
+   drop the `.example` suffix, and fill in the InfluxDB2 hostname from E6 and
+   the read-only token (via an env var the add-on substitutes, not hardcoded).
+5. **Info** tab → **Start** → **Log** tab: confirm no errors.
+6. In Grafana: **Connections → Data sources → InfluxDB** should show a green
+   "Data source is working" test result.
+7. Create a **Viewer**-role account (e.g. `phone`) for day-to-day mobile use —
+   never use `admin` outside the LAN.
+
+### E8. Cloudflared (for `docs/10-remote-access.md`)
+
+Needed once you're ready to reach Grafana/HA from outside the LAN.
+
+**Installation:**
+1. Add the repository first: `https://github.com/homeassistant-apps/repository`
+   (this replaces the older `brenner-tobias/addon-cloudflared` link you may see
+   in older guides — same app, new home).
+2. Search **"Cloudflared"** → **Install**.
+3. Continue with the full tunnel + Access setup in `docs/10-remote-access.md`
+   (this section only covers getting the app installed).
 
 ---
 
