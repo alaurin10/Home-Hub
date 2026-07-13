@@ -16,4 +16,7 @@ datasources:
       organization: home
       defaultBucket: home_assistant
     secureJsonData:
-      token: ${INFLUX_READ_TOKEN}
+      # The Grafana add-on's env_vars option only passes through GF_-prefixed
+      # names into the container (grafana/README.md) — name it GF_* even
+      # though it isn't a real Grafana server setting, or it won't be set.
+      token: ${GF_INFLUX_READ_TOKEN}

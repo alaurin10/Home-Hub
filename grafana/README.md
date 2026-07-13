@@ -29,7 +29,11 @@ env_vars:
     value: "false"
 ```
 
-Only `GF_`-prefixed environment variables are accepted by the add-on.
+Only `GF_`-prefixed environment variables are accepted by the add-on — this
+also gates the InfluxDB read token used by `provisioning/datasources/
+influxdb.yaml.example`, so it must be set as `GF_INFLUX_READ_TOKEN` (add it to
+`env_vars` alongside the ones above), even though it isn't a real Grafana
+server setting.
 
 ## Accounts (runtime, listed for the runbook)
 

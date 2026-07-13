@@ -740,8 +740,10 @@ needed.
 4. Copy `grafana/provisioning/datasources/influxdb.yaml.example` into the
    add-on's provisioning directory (its Info/Documentation tab shows the
    mounted path, typically under `/share/grafana/provisioning/datasources/`),
-   drop the `.example` suffix, and fill in the InfluxDB2 hostname from E6 and
-   the read-only token (via an env var the add-on substitutes, not hardcoded).
+   drop the `.example` suffix, and fill in the InfluxDB2 hostname from E6. Add
+   the read-only token as an **`env_vars`** entry named `GF_INFLUX_READ_TOKEN`
+   (must keep the `GF_` prefix — see `grafana/README.md`), not hardcoded in
+   the file.
 5. **Info** tab → **Start** → **Log** tab: confirm no errors.
 6. In Grafana: **Connections → Data sources → InfluxDB** should show a green
    "Data source is working" test result.
