@@ -46,6 +46,29 @@ Serves everything on port 8080 (frontend + API same-origin). The HA provider
 is deliberately thin and interface-identical to the tested simulator; exercise
 it when the first node is live (it cannot be tested before HA exists).
 
+## Auto-deploy on push (optional)
+
+`scripts/deploy.sh` polls `origin/main` and, only when `apps/dashboard/**`
+actually changed, fast-forwards the checkout and runs `docker compose up -d
+--build`. Outbound-only (it just fetches from GitHub) — no inbound ports, no
+webhook receiver, matching the no-inbound-ports posture in
+`docs/00-architecture.md` §10.
+
+Install as a systemd timer on the Docker host (runs every 5 minutes):
+
+```sh
+sudo cp systemd/dashboard-deploy.service systemd/dashboard-deploy.timer /etc/systemd/system/
+sudo sed -i 's|/opt/home-hub|<real clone path>|' /etc/systemd/system/dashboard-deploy.service
+sudo systemctl daemon-reload
+sudo systemctl enable --now dashboard-deploy.timer
+```
+
+Check it: `systemctl status dashboard-deploy.timer`, `journalctl -u dashboard-deploy.service -f`.
+The host's checkout must stay on `main` with a clean working tree — it's a
+deploy target, not a dev checkout — the script uses `git merge --ff-only` and
+fails loudly (systemd unit fails, visible in `journalctl`) rather than force
+anything.
+
 ## Configuration
 
 `config.yaml` is the customization surface: rooms, their HA entities, and the

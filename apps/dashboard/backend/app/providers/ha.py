@@ -89,11 +89,15 @@ class HAProvider:
             if not entity_rows:
                 continue
             entity_id = entity_rows[0]["entity_id"]
-            raw = [
-                {"t": _iso_to_ts(r["last_updated"]), "v": _parse_state(r["state"])}
-                for r in entity_rows
-                if "last_updated" in r
-            ]
+            # minimal_response only includes "last_updated" on the first row per
+            # entity; subsequent rows carry "last_changed" instead (or omit both
+            # if neither the state nor its update time actually changed).
+            raw = []
+            for r in entity_rows:
+                ts = r.get("last_updated") or r.get("last_changed")
+                if ts is None:
+                    continue
+                raw.append({"t": _iso_to_ts(ts), "v": _parse_state(r["state"])})
             series[entity_id] = _downsample(raw, points)
         return series
 
