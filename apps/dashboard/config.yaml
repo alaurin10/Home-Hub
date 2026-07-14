@@ -6,19 +6,6 @@
 house_name: Home
 
 rooms:
-  - id: office
-    name: Office
-    entities:
-      co2: sensor.office_air_co2
-      temperature: sensor.office_air_temperature
-      humidity: sensor.office_air_humidity
-      dew_point: sensor.office_air_dew_point
-      absolute_humidity: sensor.office_air_absolute_humidity
-    node:
-      status: binary_sensor.office_air_status
-      wifi_signal: sensor.office_air_wifi_signal
-      uptime: sensor.office_air_uptime
-
   - id: kitchen
     name: Kitchen
     entities:
