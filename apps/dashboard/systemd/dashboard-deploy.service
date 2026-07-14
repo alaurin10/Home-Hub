@@ -1,0 +1,10 @@
+[Unit]
+Description=Home-Hub dashboard: pull + redeploy if apps/dashboard changed
+After=docker.service network-online.target
+Requires=docker.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+# Replace with the real clone path on the Docker host.
+ExecStart=/opt/home-hub/apps/dashboard/scripts/deploy.sh
