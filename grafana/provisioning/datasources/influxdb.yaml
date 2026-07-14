@@ -9,11 +9,11 @@ datasources:
     # InfluxDB2 is a third-party app (Dattel/homeassistant-influxdb2) from a
     # different repo than Grafana's — its hash-prefixed hostname will differ.
     # Read the real value + port off its Info tab (docs/02 §E6); don't guess.
-    url: http://CHANGE_ME_influxdb2_hostname:8086
+    url: http://ec9cbdb7-influxdb2:8086
     isDefault: true
     jsonData:
       version: Flux
       organization: home
       defaultBucket: home_assistant
     secureJsonData:
-      token: ${INFLUX_READ_TOKEN}
+      token: ${GF_INFLUX_READ_TOKEN}

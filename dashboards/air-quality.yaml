@@ -93,5 +93,5 @@ views:
 
       # Embed a Grafana panel (set the URL once Grafana is up, Phase 4):
       # - type: iframe
-      #   url: https://grafana.<yourdomain>/d-solo/<uid>?panelId=1&kiosk
+      #   url: http://localhost:3000/api/hassio_ingress/BV-WaL-ddA7snJgN6m1m2SZO_09aRJ1jeC-I7TmQp2M/goto/bfs3mjjckqbcwc?orgId=1
       #   aspect_ratio: 50%
