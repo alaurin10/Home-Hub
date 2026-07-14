@@ -46,8 +46,8 @@ def test_dew_point_below_temperature(sim):
 
 
 def test_short_history_shape(sim):
-    series, kind = asyncio.run(sim.history(["sensor.office_air_co2"], hours=24, points=288))
-    rows = series["sensor.office_air_co2"]
+    series, kind = asyncio.run(sim.history(["sensor.living_air_co2"], hours=24, points=288))
+    rows = series["sensor.living_air_co2"]
     assert kind == "raw"
     assert 100 <= len(rows) <= 1500
     ts = [r["t"] for r in rows]
@@ -56,8 +56,8 @@ def test_short_history_shape(sim):
 
 
 def test_long_history_is_hourly_stats(sim):
-    series, kind = asyncio.run(sim.history(["sensor.office_air_co2"], hours=24 * 7, points=300))
-    rows = series["sensor.office_air_co2"]
+    series, kind = asyncio.run(sim.history(["sensor.living_air_co2"], hours=24 * 7, points=300))
+    rows = series["sensor.living_air_co2"]
     assert kind == "stats"
     assert 24 * 6 <= len(rows) <= 24 * 7 + 2
     for r in rows[:10]:
@@ -66,6 +66,6 @@ def test_long_history_is_hourly_stats(sim):
 
 def test_deterministic_model(sim):
     t = time.time() - 3600
-    a = sim._value("sensor.office_air_co2", t)
-    b = SimProvider(CONFIG)._value("sensor.office_air_co2", t)
+    a = sim._value("sensor.living_air_co2", t)
+    b = SimProvider(CONFIG)._value("sensor.living_air_co2", t)
     assert a == b

@@ -28,7 +28,6 @@ from .base import StateEvent
 # Outside any window the room decays toward the outdoor baseline.
 CO2_BASELINE = 420.0
 CO2_SCHEDULES: dict[str, list[tuple[float, float, float]]] = {
-    "office": [(9, 13, 1050.0), (14, 18, 1250.0)],
     "bedroom": [(23, 24, 1150.0), (0, 7, 1350.0)],
     "living": [(18, 23, 950.0)],
     "kitchen": [(7.5, 9, 800.0), (12, 13.5, 850.0), (18.5, 20.5, 900.0)],
@@ -37,7 +36,7 @@ CO2_SCHEDULES: dict[str, list[tuple[float, float, float]]] = {
 COOKING_EVENTS = [(8.0, 45.0, 220.0), (12.5, 65.0, 260.0), (19.0, 140.0, 340.0)]
 COOKING_TAU_H = 25.0 / 60.0  # PM decay time constant ≈ 25 min
 
-TEMP_SETPOINTS = {"office": 22.0, "bedroom": 19.5, "living": 21.5, "kitchen": 21.0}
+TEMP_SETPOINTS = {"bedroom": 19.5, "living": 21.5, "kitchen": 21.0}
 UPTIME_EPOCH = time.time() - 6 * 86400  # nodes "booted" 6 days ago
 
 
