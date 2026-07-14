@@ -26,6 +26,8 @@ Assistant's `/config` directory, so this repo *is* the configuration.
   audit: findings, hardening checklist, and the prioritized feature backlog.
 - **[`docs/09-roadmap.md`](docs/09-roadmap.md)** — infra roadmap: network
   services (DNS, reverse proxy, Tailscale) + monitoring that watches the watcher.
+- **[`docs/10-remote-access.md`](docs/10-remote-access.md)** — dashboards in any
+  browser via Cloudflare Tunnel + Access (no VPN client, no inbound ports).
 
 ## Repository layout
 

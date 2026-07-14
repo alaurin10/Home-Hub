@@ -18,6 +18,12 @@ below fits comfortably in the remainder — each LXC needs 256–512 MB RAM and
 
 ## N. Network services
 
+> **Pulled forward (July 2026):** remote *browser* access to the dashboards no
+> longer waits on anything in this section — the **Cloudflare Tunnel + Access**
+> milestone (docs/00 §10, Phase 7) ships alongside the first Grafana dashboards
+> instead, per `docs/10-remote-access.md`. N1–N3 below remain the **LAN-side and
+> admin** story (local names, internal TLS, tailnet reach); they're unchanged.
+
 ### N1 — Finish the Pi-hole LXC (already planned; do first)
 
 The LXC is designed (`proxmox/README.md`) but not yet live. Nothing else in
@@ -57,10 +63,12 @@ Today every service is `ip:port` over plain HTTP. One small LXC running
 
 ### N3 — Tailscale subnet router (remote access, still zero inbound ports)
 
-The architecture already picked Tailscale for the Companion app (docs/00
-§10/§12, as an HA add-on). A **subnet-router LXC** is the upgrade: advertise
-the LAN subnet so *everything* (Proxmox UI, Grafana, Uptime Kuma, SSH) is
-reachable remotely — not just HA — while keeping the no-inbound-ports rule.
+The architecture keeps Tailscale for the Companion app + admin (docs/00
+§10/§12, as an HA add-on); dashboards-in-a-browser go via the Cloudflare
+Tunnel instead (`docs/10-remote-access.md`). A **subnet-router LXC** is the
+admin upgrade: advertise the LAN subnet so *everything* (Proxmox UI, Grafana,
+Uptime Kuma, SSH) is reachable remotely — not just HA — while keeping the
+no-inbound-ports rule.
 
 - Tiny LXC, `tailscale up --advertise-routes=192.168.1.0/24`; approve the
   route in the admin console. Advertise Pi-hole as the tailnet DNS server and
@@ -191,4 +199,6 @@ complete the story.
 
 **Related:** the custom dashboard app (`apps/dashboard/`, July 2026) deploys as
 a compose stack when the Docker host VM lands — it's a `ha.`/`dash.` hostname
-candidate for N2 and an HTTP monitor candidate for M1.
+candidate for N2, an HTTP monitor candidate for M1, and gets its public
+`dash.<domain>` URL via the Cloudflare Tunnel (`docs/10-remote-access.md`,
+last section).

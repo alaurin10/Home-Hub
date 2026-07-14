@@ -16,7 +16,7 @@ template:
         unique_id: stale_air_nodes
         icon: mdi:wifi-strength-alert-outline
         state: >
-          {% set nodes = ['office', 'kitchen', 'bedroom', 'living'] %}
+          {% set nodes = ['kitchen', 'bedroom', 'living'] %}
           {% set ns = namespace(stale=[]) %}
           {% for n in nodes %}
             {% set s = states.sensor[n ~ '_air_co2'] %}
@@ -33,7 +33,7 @@ template:
         unique_id: air_fleet_problem
         device_class: problem
         state: >
-          {% set nodes = ['office', 'kitchen', 'bedroom', 'living'] %}
+          {% set nodes = ['kitchen', 'bedroom', 'living'] %}
           {% set stale = states('sensor.stale_air_nodes') not in ['', 'unknown', 'unavailable'] %}
           {% set ns = namespace(disconnected=false) %}
           {% for n in nodes %}

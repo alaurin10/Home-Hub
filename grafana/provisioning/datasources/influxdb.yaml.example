@@ -6,7 +6,10 @@ datasources:
   - name: InfluxDB
     type: influxdb
     access: proxy
-    url: http://a0d7b954-influxdb:8086
+    # InfluxDB2 is a third-party app (Dattel/homeassistant-influxdb2) from a
+    # different repo than Grafana's — its hash-prefixed hostname will differ.
+    # Read the real value + port off its Info tab (docs/02 §E6); don't guess.
+    url: http://CHANGE_ME_influxdb2_hostname:8086
     isDefault: true
     jsonData:
       version: Flux

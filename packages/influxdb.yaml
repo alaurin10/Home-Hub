@@ -2,7 +2,14 @@
 # the bucket bloats. Recorder exclusions are independent of this. See §8.
 influxdb:
   api_version: 2
+<<<<<<< HEAD
   host: ec9cbdb7-influxdb2 # InfluxDB add-on hostname
+=======
+  # InfluxDB2 is a third-party app (Dattel/homeassistant-influxdb2), a
+  # different repo than most other apps here — its hash-prefixed hostname will
+  # NOT match other apps'. Read the real value off its Info tab, don't guess.
+  host: CHANGE_ME_influxdb2_hostname
+>>>>>>> 63a69c0990d8ff9e7996103de7e6dbd589194e2f
   port: 8086
   ssl: false
   verify_ssl: false
@@ -14,10 +21,6 @@ influxdb:
     - friendly_name
   include:
     entities:
-      # Office (SCD40)
-      - sensor.office_air_co2
-      - sensor.office_air_temperature
-      - sensor.office_air_humidity
       # Kitchen (SCD41 + SGP41 + PMS7003) — full air quality
       - sensor.kitchen_air_co2
       - sensor.kitchen_air_temperature
