@@ -154,7 +154,7 @@ export function RoomView() {
         <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
           <section className="glass rounded-3xl p-5">
             <h2 className="mb-2 text-sm font-semibold text-ink">Temperature</h2>
-            {temp && <TrendChart series={[temp]} kind={kind} hours={hours} height={160} unit="°C" />}
+            {temp && <TrendChart series={[temp]} kind={kind} hours={hours} height={160} unit="°F" />}
           </section>
           <section className="glass rounded-3xl p-5">
             <h2 className="mb-2 text-sm font-semibold text-ink">Humidity</h2>
@@ -166,11 +166,12 @@ export function RoomView() {
           <StatTile
             label="Dew point"
             value={dew?.value ?? null}
-            unit="°C"
-            note={dew?.value !== null && dew !== undefined && dew.value! > 16 ? "muggy" : "comfortable"}
+            unit="°F"
+            // 60.8°F = 16°C, the muggy threshold
+            note={dew?.value !== null && dew !== undefined && dew.value! > 60.8 ? "muggy" : "comfortable"}
           />
           <StatTile label="Absolute humidity" value={abs?.value ?? null} unit="g/m³" />
-          <StatTile label="Temperature" value={room.metrics.temperature?.value ?? null} unit="°C" />
+          <StatTile label="Temperature" value={room.metrics.temperature?.value ?? null} unit="°F" />
           <StatTile label="Humidity" value={room.metrics.humidity?.value ?? null} unit="%" digits={0} />
         </div>
 

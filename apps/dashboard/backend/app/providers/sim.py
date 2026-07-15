@@ -119,6 +119,10 @@ def _absolute_humidity(temp_c: float, rh: float) -> float:
     return 216.7 * ((rh / 100.0) * svp) / (273.15 + temp_c)
 
 
+def _c_to_f(temp_c: float) -> float:
+    return temp_c * 9.0 / 5.0 + 32.0
+
+
 class SimProvider:
     def __init__(self, config: AppConfig) -> None:
         self.config = config
@@ -135,11 +139,15 @@ class SimProvider:
             if metric == "co2":
                 return round(_co2(room, entity_id, t), 0)
             if metric == "temperature":
-                return round(_temperature(room, entity_id, t), 1)
+                # Model runs in Celsius internally (TEMP_SETPOINTS, comfort
+                # formulas); real nodes report °F to HA in this deployment,
+                # so convert at the output boundary to match.
+                return round(_c_to_f(_temperature(room, entity_id, t)), 1)
             if metric == "humidity":
                 return round(_humidity(room, entity_id, t), 1)
             if metric == "dew_point":
-                return round(_dew_point(_temperature(room, entity_id, t), _humidity(room, entity_id, t)), 1)
+                dew_c = _dew_point(_temperature(room, entity_id, t), _humidity(room, entity_id, t))
+                return round(_c_to_f(dew_c), 1)
             if metric == "absolute_humidity":
                 return round(_absolute_humidity(_temperature(room, entity_id, t), _humidity(room, entity_id, t)), 1)
             hod = _hour_of_day(t)

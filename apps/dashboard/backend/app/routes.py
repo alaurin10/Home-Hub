@@ -49,11 +49,11 @@ async def get_rooms(request: Request):
         value = ev.get("value")
         unit = cfg.thresholds.get(metric, {}).get("unit", "")
         if metric == "temperature":
-            unit = "°C"
+            unit = "°F"
         elif metric in ("humidity",):
             unit = "%"
         elif metric == "dew_point":
-            unit = "°C"
+            unit = "°F"
         elif metric == "absolute_humidity":
             unit = "g/m³"
         return MetricValue(
