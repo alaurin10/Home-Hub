@@ -5,7 +5,7 @@ custom ESP32 sensors and lighting unified in **Home Assistant**, surfaced to two
 deliberately separate places:
 
 - **Apple Home** (HomeKit Bridge) for everyday control, Siri, and quick stats.
-- **InfluxDB + Grafana** for deep charts and history.
+- The **custom dashboard app** (`apps/dashboard/`) for deep charts and history.
 
 Local-first; nothing critical depends on the cloud. The git root maps to Home
 Assistant's `/config` directory, so this repo *is* the configuration.
@@ -34,11 +34,11 @@ Assistant's `/config` directory, so this repo *is* the configuration.
 | Path | What it is |
 |---|---|
 | `configuration.yaml` | Thin HA entrypoint; real config lives in `packages/` |
-| `packages/` | DRY, modular HA config (recorder, influxdb, homekit, monitoring, notifications) |
+| `packages/` | DRY, modular HA config (recorder, homekit, monitoring, notifications) |
 | `esphome/` | ESP device firmware configs; `common/base.yaml` is the shared DRY base |
 | `dashboards/` | Lovelace dashboards (YAML) |
 | `apps/dashboard/` | Custom dashboard app (FastAPI + React) — runs on the Docker VM, demo mode standalone |
-| `zigbee2mqtt/`, `mosquitto/`, `grafana/`, `influxdb/` | Mirrored add-on configs (authored parts only; runtime state is backup-only) |
+| `zigbee2mqtt/`, `mosquitto/` | Mirrored add-on configs (authored parts only; runtime state is backup-only) |
 | `proxmox/` | Host notes: VM specs, USB passthrough, snapshot policy |
 | `.github/workflows/` | CI validation gate + (Phase 8) self-hosted OTA deploy |
 | `scripts/` | Deploy helpers used by the Phase 8 pipeline |

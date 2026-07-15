@@ -34,7 +34,7 @@ api scene/reload
 # Full restart only when needed (integrations added/changed):
 # api homeassistant/restart
 
-# 4) Mirrored add-on configs (Z2M / Grafana) → copy into place + restart add-on.
-echo "TODO: copy zigbee2mqtt/ + grafana/ mirrors into /addon_configs and restart those add-ons"
+# 4) Mirrored add-on config (Z2M) → copy into place + restart add-on.
+echo "TODO: copy zigbee2mqtt/ mirror into /addon_configs and restart that add-on"
 
 echo "HA reload complete."

@@ -20,7 +20,7 @@ below fits comfortably in the remainder — each LXC needs 256–512 MB RAM and
 
 > **Pulled forward (July 2026):** remote *browser* access to the dashboards no
 > longer waits on anything in this section — the **Cloudflare Tunnel + Access**
-> milestone (docs/00 §10, Phase 7) ships alongside the first Grafana dashboards
+> milestone (docs/00 §10, Phase 7) ships alongside the custom dashboard app
 > instead, per `docs/10-remote-access.md`. N1–N3 below remain the **LAN-side and
 > admin** story (local names, internal TLS, tailnet reach); they're unchanged.
 
@@ -66,8 +66,8 @@ Today every service is `ip:port` over plain HTTP. One small LXC running
 The architecture keeps Tailscale for the Companion app + admin (docs/00
 §10/§12, as an HA add-on); dashboards-in-a-browser go via the Cloudflare
 Tunnel instead (`docs/10-remote-access.md`). A **subnet-router LXC** is the
-admin upgrade: advertise the LAN subnet so *everything* (Proxmox UI, Grafana,
-Uptime Kuma, SSH) is reachable remotely — not just HA — while keeping the
+admin upgrade: advertise the LAN subnet so *everything* (Proxmox UI, Uptime
+Kuma, SSH) is reachable remotely — not just HA — while keeping the
 no-inbound-ports rule.
 
 - Tiny LXC, `tailscale up --advertise-routes=192.168.1.0/24`; approve the
@@ -107,8 +107,7 @@ loop (this is the exact fix deferred by audit finding 1).
 |---|---|---|
 | HA `http://<ha>:8123/api/` | HTTP (expect 401) | HA Core down/hung |
 | Mosquitto `<ha>:1883` | TCP | broker down → Zigbee dead |
-| InfluxDB `/health` | HTTP | history pipeline down |
-| Grafana `/api/health` | HTTP | dashboards down |
+| Dashboard app `/api/health` | HTTP | custom dashboard down |
 | Pi-hole | DNS query | DNS down (the "internet is broken" pager) |
 | Proxmox `https://<pve>:8006` | HTTP | host UI/API |
 
@@ -135,22 +134,7 @@ audit finding 1:
 - **DoD:** pull the host's network cable → external alert within ~10 min;
   disable the backup job for a day → `backup-ok` alert.
 
-### M3 — Host metrics into the existing InfluxDB + Grafana
-
-No new service needed: Proxmox has a **native metric server** (Datacenter →
-Metric Server → InfluxDB v2). Host CPU/RAM/disk/guest stats land in the same
-InfluxDB the air sensors use.
-
-- Separate bucket (`proxmox`) + a second write token — keep the curated
-  `home_assistant` bucket clean.
-- This should produce the repo's **first committed Grafana dashboard JSON**
-  under `grafana/provisioning/dashboards/` (host health: CPU, RAM, per-guest,
-  SSD wearout) — making the provisioning-only Grafana story real. Set
-  `allowUiUpdates: false` once dashboards are code.
-- **DoD:** `git grep` finds the dashboard JSON; host CPU graph visible in
-  Grafana; air-quality bucket unchanged.
-
-### M4 — HA System Monitor + alert wiring (closes the monitoring.yaml TODO)
+### M3 — HA System Monitor + alert wiring (closes the monitoring.yaml TODO)
 
 The TODO at the bottom of `packages/monitoring.yaml`: add the **System
 Monitor** integration (UI config entry), then alert on its entities in the
@@ -158,7 +142,7 @@ package — disk >85% (recorder DB growth is the usual culprit on a 48 GB
 disk), memory pressure. Pattern to copy: the existing `air_fleet_problem`
 automation (persistent notification + notify group).
 
-### M5 — NUT when the UPS lands
+### M4 — NUT when the UPS lands
 
 Unchanged from docs/00/§12 and the BOM: UPS → NUT integration → "on battery"
 alert + graceful shutdown. Listed here only so the monitoring story has its
@@ -187,14 +171,13 @@ exists (see §18 backlog for details — no new design work needed):
 | 2 | M1 Uptime Kuma | LXC | 256–512 MB | $0 | Phase 1 host |
 | 3 | M2 dead-man's switch | no (HA package + backup hook) | — | $0 | HA live (Phase 1) |
 | 4 | N2 Caddy | LXC | 256 MB | $0 | N1 (names) |
-| 5 | M3 Proxmox → Influx + first Grafana JSON | no | — | $0 | Phase 4 Influx |
-| 6 | N3 Tailscale subnet router | LXC | 256 MB | $0 | — |
-| 7 | M4 System Monitor wiring | no | — | $0 | HA live |
-| 8 | N4 segmentation pass | no | — | $0 | — |
-| 9 | M5 NUT | no | — | UPS (~$55) | UPS purchase |
+| 5 | N3 Tailscale subnet router | LXC | 256 MB | $0 | — |
+| 6 | M3 System Monitor wiring | no | — | $0 | HA live |
+| 7 | N4 segmentation pass | no | — | $0 | — |
+| 8 | M4 NUT | no | — | UPS (~$55) | UPS purchase |
 
 Worst case adds ~1.5 GB RAM across four LXCs against ~6 GB free. Items 1–3
-deliver the most safety per hour of effort; 4–6 are quality-of-life; 7–9
+deliver the most safety per hour of effort; 4–6 are quality-of-life; 7–8
 complete the story.
 
 **Related:** the custom dashboard app (`apps/dashboard/`, July 2026) deploys as

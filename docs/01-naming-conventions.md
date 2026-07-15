@@ -49,5 +49,5 @@
 > VOC/NOx block + a `pmsx003` PM block, `type: PMSX003` — the generic type that
 > covers the PMS7003) plus a `uart:` bus on `esp-kitchen-air.yaml` for the
 > PMS7003. SGP41 is humidity-compensated from the SCD41 (`scd4x_temperature` /
-> `scd4x_humidity` ids). InfluxDB + HomeKit allowlists and the air-quality
-> dashboard are extended for the PM2.5 / VOC / NOx entities.
+> `scd4x_humidity` ids). The HomeKit allowlist and the air-quality dashboard
+> are extended for the PM2.5 / VOC / NOx entities.

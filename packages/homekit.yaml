@@ -9,7 +9,8 @@ homekit:
       include_entities:
         # Air-quality sensors map to native Apple Home tiles (CO2 / Air Quality /
         # Temperature / Humidity). PM2.5 (device_class pm25) → Air Quality tile.
-        # VOC/NOx are index values (no clean native tile) → kept to Grafana only.
+        # VOC/NOx are index values (no clean native tile) → kept to the
+        # dashboard app only (apps/dashboard/).
         # Kitchen (full)
         - sensor.kitchen_air_co2
         - sensor.kitchen_air_temperature

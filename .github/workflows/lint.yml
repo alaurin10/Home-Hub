@@ -24,7 +24,7 @@ jobs:
 
   # The "revisit with a CI drift check" from audit finding 2
   # (docs/08-audit-2026-06.md): fail when configs reference entities nothing
-  # defines, or an ESPHome measurement is missing from the InfluxDB allowlist.
+  # defines.
   entity-drift:
     runs-on: ubuntu-latest
     steps:

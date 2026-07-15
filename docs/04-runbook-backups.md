@@ -7,7 +7,7 @@
 1. **Proxmox VM snapshots** — host-level, fast rollback. **Before every** HA Core /
    add-on / OS update.
 2. **HA Supervisor backups** — nightly **partial** (`/config` + Z2M + Mosquitto +
-   InfluxDB + MariaDB); weekly **full**.
+   MariaDB); weekly **full**.
 3. **Off-site copy** — Google Drive Backup add-on (recommended) or rclone → NAS/B2.
 
 ## Retention
@@ -21,7 +21,7 @@
 ## What's covered where
 - **git** = authored config (this repo).
 - **Backups** = runtime state: `.storage/` (incl. **HomeKit pairing**), recorder
-  DB, **Zigbee network DB / coordinator backup**, Influx/MariaDB data + tokens.
+  DB, **Zigbee network DB / coordinator backup**, MariaDB data + tokens.
 - **Snapshots** = whole-VM rollback.
 
 ## Checklist

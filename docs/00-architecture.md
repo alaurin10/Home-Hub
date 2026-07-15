@@ -7,9 +7,9 @@
 
 A single repository for a DIY smart home — custom ESP32 sensors, lighting, and
 more — unified in **Home Assistant** and surfaced to two deliberately separate
-places: **Apple Home** for everyday control/Siri/basic stats, and **InfluxDB +
-Grafana** for deep charts and history. Local-first; nothing critical depends on
-the cloud.
+places: **Apple Home** for everyday control/Siri/basic stats, and a **custom
+dashboard app** (`apps/dashboard/`) for deep charts and history. Local-first;
+nothing critical depends on the cloud.
 
 ---
 
@@ -18,9 +18,10 @@ the cloud.
 You want a self-hosted, local-first smart home where DIY devices (air-quality
 sensors first, then lighting and more) all report into Home Assistant, which
 (a) exposes curated entities to **Apple Home** via the HomeKit Bridge (your
-HomePod is the always-on hub + Thread border router), and (b) forwards selected
-metrics to **InfluxDB**, charted in **Grafana**. The control layer and the data
-layer stay separate by design.
+HomePod is the always-on hub + Thread border router), and (b) surfaces deep
+charts and history through the **custom dashboard app**, reading HA's own live
+state + long-term statistics directly (no separate time-series database). The
+control layer and the data layer stay separate by design.
 
 This plan resolves the starting plan's open decisions, fills the operational
 gaps that bite later (backups, power, VLAN discovery, fleet updates, entity
@@ -38,7 +39,7 @@ hardware, future-proof radios).
 | Thread/Matter | **Via the HomePod now**; dedicated HA Thread radio only later | One radio per protocol (multiprotocol-on-one-stick still unreliable in 2026) |
 | Default sensor chip | **classic ESP32 (WROOM-32 / S3)**; a couple of ESP32-C6 as a cheap Thread hedge | Most mature ESPHome support |
 | Recorder DB | **MariaDB** (add-on) | SQLite gets sluggish at 20–60 devices; avoids a later migration |
-| Long-term data | **InfluxDB 2.x + Grafana** (+ HA long-term statistics) | Built-in UI, tokens, retention buckets, good Grafana support |
+| Long-term data | **HA long-term statistics** (via the custom dashboard app) | InfluxDB + Grafana removed July 2026 — LTS + the dashboard app's own 7/30/90d views cover this without a second database |
 | Secrets | **private repo + gitignored `secrets.yaml`/`.env`** + committed `*.example` | Never commit real secrets |
 | Remote access | **Tailscale** for admin + the HA Companion app; **Cloudflare Tunnel + Access** for browser dashboards on any device | Reach dashboards anywhere, no open ports, data stays local |
 | Network | ESP/IoT devices on an **isolated IoT VLAN** + DHCP reservations | ESP32s aren't hardened; isolate them |
@@ -75,8 +76,8 @@ at once (one radio per protocol).
 ```
   Proxmox host  (mini PC · 16 GB · SSD · on UPS)
   ├── VM: Home Assistant OS  ── Supervisor add-ons:
-  │        ESPHome · Mosquitto · Zigbee2MQTT · InfluxDB 2.x ·
-  │        Grafana · MariaDB · Tailscale · SSH/VS Code Server
+  │        ESPHome · Mosquitto · Zigbee2MQTT · MariaDB ·
+  │        Tailscale · SSH/VS Code Server
   │        └── USB passthrough (by Device ID) ──► ZBT-2 Zigbee coordinator
   ├── VM: Docker host (Debian) ── containerized apps (separate repos; data gitignored):
   │        garmin-mcp (+ future MCP servers) · Garmin insights dashboard
@@ -106,13 +107,12 @@ at once (one radio per protocol).
         +---------------------+-----------------------+
         |                                             |
 +-------v---------+                        +----------v-----------+
-| HomeKit Bridge  |                        |  InfluxDB 2.x        |
-|  -> Apple Home  |                        |  + Grafana           |
+| HomeKit Bridge  |                        |  Custom dashboard app |
+|  -> Apple Home  |                        |  (apps/dashboard/)    |
 +-------+---------+                        +----------+-----------+
         |                                             |
-  HomePod (Home Hub + Thread BR) + iPhone    Browser / HA Companion app /
-  (Siri, remote via iCloud)                  wall tablet / Grafana
-                                             (charts, history)
+  HomePod (Home Hub + Thread BR) + iPhone    Browser (live via HA WS API,
+  (Siri, remote via iCloud)                  history via REST + HA LTS)
 
   Remote access: Tailscale (admin + HA app)  |  Cloudflare Tunnel + Access (dashboards, any browser)
 ```
@@ -189,7 +189,7 @@ private repo with you as the only pusher makes the trade-offs acceptable.
                               on success    │ triggers
    ┌───────────────────────────────────────▼──────────────────────┐
    │ SELF-HOSTED runner on your LAN (Proxmox LXC, label home-lan):  │
-   │  1. sync HA/Z2M/Grafana config → reload via HA API             │
+   │  1. sync HA/Z2M config → reload via HA API                     │
    │  2. ESPHome compile + OTA to CHANGED devices (canary first)    │
    │  3. post-deploy health check → notify / rollback on failure    │
    └────────────────────────────────────────────────────────────────┘
@@ -204,8 +204,8 @@ private repo with you as the only pusher makes the trade-offs acceptable.
      shared bits) changed → target **all** nodes; else only the changed
      `esphome/<node>.yaml` (don't reflash 50 devices for a 1-node edit).
    - **Config:** sync repo → `/config` (runner has SSH to the HA VM); **reload via
-     the HA API** (targeted reloads, or a restart for core changes); copy mirrored
-     Z2M/Grafana configs + restart those add-ons.
+     the HA API** (targeted reloads, or a restart for core changes); copy the
+     mirrored Z2M config + restart that add-on.
    - **ESPHome OTA, staged:** flash a **canary** node (`esphome run <node>.yaml`),
      **health-check** it (poll HA until its connection sensor is back; timeout =
      fail), then flash the rest in small batches.
@@ -250,7 +250,7 @@ their known sharp edges (2026-06 audit, `docs/08-audit-2026-06.md`):
 
 **Remote-from-anywhere:** push via GitHub from a laptop or the mobile app; the LAN
 runner deploys (outbound to GitHub only — **no inbound exposure**); watch progress
-in the Actions tab. Tailscale stays for *you* to reach HA/Grafana directly.
+in the Actions tab. Tailscale stays for *you* to reach HA directly.
 
 **Build order:** use manual ESPHome **"Update All"** while building (Phases 2–6);
 turn on this pipeline in **Phase 8** once the system is stable. Lighter interim
@@ -271,9 +271,9 @@ CI → merge → host pulls.
    `scripts.yaml`, `scenes.yaml`, `packages/`, `esphome/`, YAML dashboards,
    `*.example` templates.
 2. **Add-on configs outside `/config`** (`/addon_configs/<slug>/`): **mirror**
-   authored files into the repo (`zigbee2mqtt/configuration.yaml`, Grafana
-   provisioning/dashboards); generated state (Z2M `coordinator_backup.json` +
-   device DB, Influx/MariaDB data + tokens) → **backup only**.
+   authored files into the repo (`zigbee2mqtt/configuration.yaml`); generated
+   state (Z2M `coordinator_backup.json` + device DB, MariaDB data + tokens) →
+   **backup only**.
 3. **Pure runtime, never git** (`.storage/` incl. **HomeKit pairing**, recorder
    DB, Zigbee network DB) → **Supervisor backup + Proxmox snapshot only**.
 
@@ -362,21 +362,21 @@ ones into packages later.
 |---|---|---|---|
 | **Recorder (MariaDB)** | HA history/logbook UI | **short: 7–10 days** | most things briefly; `exclude` noisy entities |
 | **Long-Term Statistics** | hourly min/mean/max | ~forever (tiny) | numeric sensors w/ `state_class`; free, automatic |
-| **InfluxDB 2.x** | high-res charts, Grafana | per-bucket (e.g. 90 d) | a **curated `include:` allowlist** only |
 
-- **Never forward everything to InfluxDB** — use the `include:` allowlist or it
-  bloats. Recorder `exclude` is independent of Influx forwarding.
+- **No separate time-series database** (InfluxDB + Grafana were removed July
+  2026) — the custom dashboard app (`apps/dashboard/`) reads HA's live state
+  over the WebSocket API for real-time, the REST history API for ≤48h, and
+  Long-Term Statistics directly for 7/30/90d views. One less service to run,
+  patch, and back up.
 - **Allowlists stay explicit (per-entity), not globs** — a glob like
   `sensor.*_air_*` would silently sweep in the per-node diagnostics
   (`*_air_uptime`, `*_air_wifi_signal` from `common/base.yaml`), which is
-  exactly the bloat the allowlist exists to prevent. Accepted cost: every new
-  node adds a few lines to `packages/influxdb.yaml` + `packages/homekit.yaml`
-  in the same PR (the device registry in `docs/01-naming-conventions.md` lists
-  the expected entities). Revisit (e.g. a CI drift check) if this becomes
-  painful past ~20 nodes.
-- LTS covers "last year of CO2" for free; Grafana/Influx for rich, annotated,
-  cross-metric dashboards.
-- Influx: org + bucket + **read-only token for Grafana** + write token for HA.
+  exactly the bloat the HomeKit allowlist exists to prevent. Accepted cost:
+  every new node adds a few lines to `packages/homekit.yaml` in the same PR
+  (the device registry in `docs/01-naming-conventions.md` lists the expected
+  entities).
+- LTS covers "last year of CO2" for free; the dashboard app's own per-room
+  trend charts (§10) cover rich, cross-metric views without a second database.
 
 ---
 
@@ -388,7 +388,8 @@ ones into packages later.
 - **Curate exposure with `homekit: include_entities`** (allowlist, never deny);
   watch the **~150-accessory/bridge limit**; expose control + canonical sensors
   (lights, switches, climate, motion, contact, temp/humidity, native **Air
-  Quality / CO2 / VOC** tiles). Numeric "data" entities → Grafana, not Apple Home.
+  Quality / CO2 / VOC** tiles). Numeric "data" entities → the custom dashboard
+  app, not Apple Home.
 - **Native Apple Home tiles:** map PM2.5/VOC → Air Quality, CO2 → Carbon Dioxide
   (with high-CO2 alert), temp/humidity → native tiles.
 - **Pairing is fragile state:** **freeze entity unique_ids before pairing**;
@@ -402,36 +403,35 @@ ones into packages later.
 
 ## 10. Dashboards — hosted locally, reached from anywhere
 
-**Hosting stays local — no Railway, no cloud DB.** HA (Lovelace) + Grafana run on
-the mini PC; their value is local data (HA's live state + InfluxDB history) that
-never has to leave home. Railway can't see your LAN data without you tunneling out
-anyway, and Grafana Cloud's free tier keeps only **~14 days** of history — so local
-hosting wins on **retention + privacy**, and there's **no custom app to build**.
+**Hosting stays local — no Railway, no cloud DB.** HA (Lovelace) and the custom
+dashboard app both run on the mini PC / Docker host VM; their value is local
+data (HA's live state + long-term statistics) that never has to leave home.
+Railway can't see your LAN data without you tunneling out anyway — so local
+hosting wins on **retention + privacy**.
 - **HA dashboards (Lovelace):** everyday at-a-glance + control; best via the HA
   Companion app (native feel, widgets, Watch).
-- **Grafana:** deep-history charts off InfluxDB; **embeddable into HA dashboards**.
 - **Wall tablet** in kiosk mode for an always-on panel; start with HA-native
-  history/LTS cards and lean on Grafana as data grows.
-- **Custom dashboard app (`apps/dashboard/`)** — *supersedes the "no custom app
-  to build" line above*: a FastAPI + React app (added July 2026) that complements,
-  not replaces, Lovelace/Grafana. Live view via HA's WS API, short history via
-  REST, long history via HA long-term statistics; drag-and-drop layout persisted
-  server-side; first-class demo mode (runs before any hardware exists). Ships as
-  a compose stack on the **Docker host VM**, reached via the same
-  Tailscale/Cloudflare Access posture (HA token server-side, no app auth, no
-  inbound ports). **Monorepo exception**: it lives in this repo rather than a
-  separate one because it shares the entity registry (§7), `config.yaml` mirrors
-  `packages/`, and it rides this repo's CI (`app-ci.yml`).
+  history/LTS cards.
+- **Custom dashboard app (`apps/dashboard/`)** — the deep-history/analytics
+  layer (**InfluxDB + Grafana served this role until removed, July 2026**): a
+  FastAPI + React app (added July 2026) with live view via HA's WS API, short
+  history via REST, long history via HA long-term statistics; drag-and-drop
+  layout persisted server-side; first-class demo mode (runs before any
+  hardware exists). Ships as a compose stack on the **Docker host VM**, reached
+  via the same Tailscale/Cloudflare Access posture (HA token server-side, no
+  app auth, no inbound ports). **Monorepo exception**: it lives in this repo
+  rather than a separate one because it shares the entity registry (§7),
+  `config.yaml` mirrors `packages/`, and it rides this repo's CI (`app-ci.yml`).
 
 **Reach them from any device, anywhere → Cloudflare Tunnel + Access** (reuses the
 Cloudflare account you already have). **Decided July 2026** after revisiting the
-alternatives (Pangolin on a VPS, port-forward reverse proxy, Tailscale Funnel,
-Grafana Cloud — rejected on cost/no-inbound-ports/no-custom-domain/off-prem-data
-respectively); dashboards-over-Tailscale is **superseded for viewing** — Tailscale
-keeps only admin/SSH + the Companion app. Runbook: `docs/10-remote-access.md`.
+alternatives (Pangolin on a VPS, port-forward reverse proxy, Tailscale Funnel —
+rejected on cost/no-inbound-ports/no-custom-domain respectively); dashboards-
+over-Tailscale is **superseded for viewing** — Tailscale keeps only admin/SSH +
+the Companion app. Runbook: `docs/10-remote-access.md`.
 - The **`cloudflared` HA add-on** opens an **outbound-only** tunnel to Cloudflare's
   edge — **no router ports opened, no public IP exposed** — publishing dashboards
-  at e.g. `grafana.<yourdomain>` / `ha.<yourdomain>`.
+  at e.g. `dash.<yourdomain>` / `ha.<yourdomain>`.
 - **Cloudflare Access (Zero Trust)** puts an **identity gate** (Google SSO or
   one-time-PIN email) in front, so unauthenticated traffic never reaches the
   origin. Open the URL in **any browser on any device** → log in → dashboards.
@@ -459,10 +459,9 @@ keeps only admin/SSH + the Companion app. Runbook: `docs/10-remote-access.md`.
   and only the view is proxied*.
 
 **Build order:** LAN + Tailscale work from Phase 1; the Cloudflare Tunnel +
-Access step is **pulled forward** (July 2026) to land with the first Grafana
-dashboards instead of waiting for Phase 7 — follow `docs/10-remote-access.md`
-(harden Grafana add-on → cloudflared add-on → Access policies → verify on
-cellular).
+Access step is **pulled forward** (July 2026) to land with the custom
+dashboard app instead of waiting for Phase 7 — follow `docs/10-remote-access.md`
+(cloudflared add-on → Access policies → verify on cellular).
 
 ---
 
@@ -484,13 +483,13 @@ cellular).
 ## 12. Backups, power & monitoring
 
 **Backups (layered):** **Proxmox VM snapshots** (host-level, fast rollback) +
-**HA Supervisor backups** (nightly partial: `/config` + Z2M + Mosquitto + Influx
-+ MariaDB; weekly full) + **off-site copy**. Retention: 7 daily + 4 weekly local;
+**HA Supervisor backups** (nightly partial: `/config` + Z2M + Mosquitto +
+MariaDB; weekly full) + **off-site copy**. Retention: 7 daily + 4 weekly local;
 4 weekly off-site. **Off-site:** Google Drive Backup add-on (recommended) or
 rclone→NAS/B2. **Encrypt backups** (they hold secrets + the Zigbee network key).
 **Do a restore drill in Phase 7.**
 
-**Power:** **UPS** + **NUT add-on** for graceful shutdown (protects MariaDB/Influx
+**Power:** **UPS** + **NUT add-on** for graceful shutdown (protects MariaDB
 from corruption on unclean power loss).
 
 **Monitoring (`packages/monitoring.yaml`):** fleet-wide stale/disconnect
@@ -561,20 +560,20 @@ changes"; **back up (and snapshot) before any update.**
   `include_entities`; confirm HomePod is Home Hub; **freeze unique_ids first**;
   pair bridge; assign rooms. **DoD:** AQ/CO2 accessory in Apple Home; test toggle
   reflects in HA ≤1 s; Siri via HomePod; pairing documented as fragile state.
-- **Phase 4 — InfluxDB + Grafana + first chart:** install both add-ons; org/
-  bucket/retention + read-only Grafana token; `packages/influxdb.yaml` w/
-  **`include:` allowlist**; Grafana provisioning + first dashboard. **DoD:** live
-  CO2 chart from Influx; only allowlisted entities in Influx; recorder retention
-  short; LTS populating.
+- ~~**Phase 4 — InfluxDB + Grafana + first chart**~~ — **removed July 2026**;
+  superseded by the custom dashboard app (§10), which reads HA's recorder/LTS
+  directly with no second database to install or maintain. Recorder retention
+  stays short; LTS populating covers the same "live chart" DoD this phase
+  originally targeted.
 - **Phase 5 — Mosquitto + Zigbee2MQTT + first bulb:** **ZBT-2** on USB-2 extension,
   **passed through by Device ID**; Mosquitto add-on + MQTT user; Z2M add-on (serial
   by-id, chosen Zigbee channel clear of WiFi) → Mosquitto; mirror Z2M config to
   repo; pair bulb, **rename immediately**; add light to HomeKit allowlist. **DoD:**
   bulb controllable from HA **and** Apple Home; **independence test** (§15) passes.
 - **Phase 6 — Automations + dashboards:** first real automations (motion→light,
-  high-CO2→notify); `dashboards/overview.yaml`; finalize Grafana AQ dashboard;
-  expand ESP nodes via shared base. **DoD:** ≥2 automations fire on real triggers;
-  overview shows all rooms; CI green.
+  high-CO2→notify); `dashboards/overview.yaml`; expand ESP nodes via shared
+  base. **DoD:** ≥2 automations fire on real triggers; overview shows all
+  rooms; CI green.
 - **Phase 7 — Backups + monitoring + secure remote access + hardening:** Supervisor
   auto-backups + off-site + Proxmox snapshot policy; finalize `monitoring.yaml`;
   NUT/UPS graceful shutdown; **`cloudflared` add-on → Cloudflare Tunnel + Access**
@@ -582,8 +581,9 @@ changes"; **back up (and snapshot) before any update.**
   lock down (no inbound ports — only the outbound tunnel + Tailscale; services
   otherwise LAN-only); backup + recovery runbooks. **DoD:** **restore drill**
   succeeds; pulling a sensor's power fires the stale alert; off-site copy verified;
-  UPS triggers graceful shutdown; **Grafana/HA open via the Cloudflare URL on a
-  phone off-WiFi behind the Access login, and the HA Companion app works via Tailscale.**
+  UPS triggers graceful shutdown; **the dashboard app/HA open via the Cloudflare
+  URL on a phone off-WiFi behind the Access login, and the HA Companion app
+  works via Tailscale.**
 - **Phase 8 — Automated push-to-deploy (CI/CD):** stand up the **self-hosted GitHub
   Actions runner** (isolated Proxmox LXC, label `home-lan`); add `deploy.yml`
   (config sync + HA-API reload + staged ESPHome OTA with change-detection, canary,
@@ -603,8 +603,6 @@ changes"; **back up (and snapshot) before any update.**
   value rises in ~30–60 s**; OTA an update successfully.
 - **Apple Home (P3):** accessory shows live AQ/CO2; test toggle flips HA ≤1 s;
   Siri via HomePod; **on cellular, control works through the HomePod**.
-- **InfluxDB (P4):** Data Explorer shows points tagged by `entity_id`; Grafana
-  updates; a **non-allowlisted entity is absent** from Influx; LTS lists the sensor.
 - **Lights survive HA (P5):** restart **HA Core** → bulb returns **without
   re-pairing** (Z2M/Mosquitto kept running); **bind a Zigbee remote directly to the
   bulb** → press it **with HA Core stopped** → bulb still toggles; reboot host →
@@ -613,11 +611,11 @@ changes"; **back up (and snapshot) before any update.**
   triggered" + Logbook.
 - **Backups/monitoring (P7):** unplug a node → stale alert; backup exists locally
   **and** off-site; **restore drill** keeps Zigbee net + (re-)establishes HomeKit;
-  UPS → "on battery" → graceful shutdown; **on cellular, Grafana opens via the
-  Cloudflare URL (Access login) and the HA app works via Tailscale**.
+  UPS → "on battery" → graceful shutdown; **on cellular, the dashboard app opens
+  via the Cloudflare URL (Access login) and the HA app works via Tailscale**.
 - **End-to-end:** walk into office → motion turns on a Zigbee light → CO2 climbs →
-  iPhone notified → view the spike in Grafana → turn light off via Siri/HomePod.
-  All five links = integrated.
+  iPhone notified → view the spike in the dashboard app → turn light off via
+  Siri/HomePod. All five links = integrated.
 
 ---
 
@@ -627,7 +625,6 @@ changes"; **back up (and snapshot) before any update.**
 2. `.gitignore` — gates what secrets/state reach GitHub; before first push.
 3. `esphome/common/base.yaml` — the DRY foundation every node inherits.
 4. `packages/homekit.yaml` — the curated `include_entities` allowlist (the #1 footgun).
-5. `packages/influxdb.yaml` — the Influx `include:` allowlist + recorder/LTS/Influx split.
 
 ---
 
@@ -642,7 +639,7 @@ changes"; **back up (and snapshot) before any update.**
     `esp-kitchen-air.yaml` includes both modules plus a `uart:` bus (GPIO16/17);
     bedroom/living reuse `sensors_common.yaml` (SCD41) unchanged. Shared board +
     I²C bus config (SCD41 `0x62` + SGP41 `0x59`, no conflict) lives in
-    `esphome/common/device_esp32.yaml`. InfluxDB/HomeKit allowlists and
+    `esphome/common/device_esp32.yaml`. The HomeKit allowlist and
     `dashboards/air-quality.yaml` carry the PM2.5 / VOC / NOx entities; CI's
     entity-drift check (`scripts/check-entity-drift.py`) keeps them honest.
 - **HA OS VM creation method:** community Proxmox helper-script vs official VM image. *Rec:* whichever is current/most-maintained at build time.
@@ -657,8 +654,9 @@ changes"; **back up (and snapshot) before any update.**
   Cloudflare-managed domain (`grafana.<domain>`, `ha.<domain>`; `dash.<domain>`
   later). Runbook: `docs/10-remote-access.md`.
 - **Cloudflare Access identity** — **DECIDED (July 2026):** Google SSO
-  (one-time-PIN email as fallback), and **both** layers: Access gate *and* the
-  app's own login (Grafana anonymous access off, viewer account for mobile).
+  (one-time-PIN email as fallback), and **both** layers: Access gate *and*
+  each app's own login where one exists (the dashboard app has none by
+  design — Access is its only gate).
 - **Companion-app remote path** — **DECIDED (July 2026):** Tailscale (Access
   breaks the app's login flow; browsers are fine).
 
@@ -682,8 +680,8 @@ Rough order of value:
 2. **Energy monitoring** (`power` role) — start with 2–3 Zigbee **metering
    plugs** (per-appliance, pairs with the Phase 5 mesh); later a CT-clamp
    node (e.g. Emporia Vue 2 reflashed to ESPHome) for whole-home. Feeds HA's
-   built-in Energy dashboard for free; InfluxDB + Grafana is the showcase
-   for this data.
+   built-in Energy dashboard for free; the custom dashboard app is the
+   showcase for this data.
 3. **Air-quality-driven actuation** — close the loop on the existing sensors:
    kitchen PM2.5 spike → metering plug switches the air purifier on / push
    "run the range hood"; bedroom CO2 high before sleep → notify. One Zigbee

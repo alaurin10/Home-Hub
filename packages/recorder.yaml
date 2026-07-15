@@ -1,5 +1,5 @@
-# Recorder → MariaDB add-on. Short retention; long-term data goes to InfluxDB +
-# Home Assistant Long-Term Statistics. See docs/00-architecture.md §8.
+# Recorder → MariaDB add-on. Short retention; long-term data goes to Home
+# Assistant Long-Term Statistics. See docs/00-architecture.md §8.
 recorder:
   db_url: !secret recorder_db_url
   purge_keep_days: 10

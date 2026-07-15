@@ -11,9 +11,9 @@
 # a temperature) converts the result back to °F. Absolute humidity has no
 # common imperial equivalent, so it stays g/m³ regardless.
 #
-# Deliberately NOT added to the InfluxDB/HomeKit allowlists (packages/
-# influxdb.yaml, packages/homekit.yaml) — they are derived from data already
-# forwarded. Add them explicitly there if you want them charted/surfaced.
+# Deliberately NOT added to the HomeKit allowlist (packages/homekit.yaml) —
+# they are derived from data already exposed. Add them there if you want them
+# surfaced as Apple Home tiles too.
 
 template:
   - sensor:

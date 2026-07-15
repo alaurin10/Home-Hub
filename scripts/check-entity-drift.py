@@ -1,16 +1,11 @@
 #!/usr/bin/env python3
-"""Entity-drift check: catch references to entities that don't exist, and
-ESPHome measurements missing from the InfluxDB allowlist.
+"""Entity-drift check: catch references to entities that don't exist.
 
-Closes audit finding 2 (docs/08-audit-2026-06.md): the InfluxDB/HomeKit
-allowlists are hand-curated, and a forgotten entry fails SILENTLY — the data
-just never lands. This check re-derives the fleet's entity IDs from the
-ESPHome configs and fails CI when:
-
-  (a) packages/ or dashboards/ reference a sensor./binary_sensor. entity that
-      nothing defines (typo, renamed node, dead allowlist entry), or
-  (b) an ESPHome measurement entity (diagnostics excluded) is missing from
-      packages/influxdb.yaml — the "added a node, forgot the allowlist" cliff.
+Closes audit finding 2 (docs/08-audit-2026-06.md): the HomeKit allowlist is
+hand-curated, and a forgotten/stale entry fails SILENTLY. This check
+re-derives the fleet's entity IDs from the ESPHome configs and fails CI when
+packages/ or dashboards/ reference a sensor./binary_sensor. entity that
+nothing defines (typo, renamed node, dead allowlist entry).
 
 HomeKit completeness is deliberately NOT checked: its allowlist curates
 exclusions on purpose (VOC/NOx indices are not HomeKit-meaningful).
@@ -32,10 +27,6 @@ import yaml
 
 REPO = Path(__file__).resolve().parent.parent
 ESPHOME_DIR = REPO / "esphome"
-
-# ESPHome diagnostic entities (common/base.yaml): deliberately kept out of
-# InfluxDB (recorder-excluded too), so completeness check (b) skips them.
-DIAGNOSTIC_NAMES = {"uptime", "wifi_signal", "status", "esphome_version", "ip_address"}
 
 # Entities referenced in configs but defined outside this repo (UI-configured
 # integrations, entity_id overrides, HA-UI renames). Empty today.
@@ -91,11 +82,10 @@ def collect_names(domain_block) -> list[str]:
     return names
 
 
-def esphome_defined() -> tuple[set[str], set[str]]:
-    """(all entity IDs, measurement entity IDs) across every esphome node.
-    ESPHome text_sensors surface in HA's `sensor` domain."""
+def esphome_defined() -> set[str]:
+    """All entity IDs defined across every esphome node. ESPHome text_sensors
+    surface in HA's `sensor` domain."""
     all_ids: set[str] = set()
-    measurements: set[str] = set()
     for node_file in sorted(ESPHOME_DIR.glob("esp-*.yaml")):
         node = load_yaml(node_file)
         friendly = node["substitutions"]["friendly_name"]
@@ -109,11 +99,8 @@ def esphome_defined() -> tuple[set[str], set[str]]:
                                       ("binary_sensor", "binary_sensor"),
                                       ("text_sensor", "sensor")):
                 for short in collect_names(doc.get(domain)):
-                    entity = f"{ha_domain}.{slugify(friendly + ' ' + short)}"
-                    all_ids.add(entity)
-                    if domain == "sensor" and slugify(short) not in DIAGNOSTIC_NAMES:
-                        measurements.add(entity)
-    return all_ids, measurements
+                    all_ids.add(f"{ha_domain}.{slugify(friendly + ' ' + short)}")
+    return all_ids
 
 
 def template_defined() -> set[str]:
@@ -147,14 +134,8 @@ def referenced() -> dict[str, set[str]]:
     return refs
 
 
-def influxdb_allowlist() -> set[str]:
-    doc = load_yaml(REPO / "packages" / "influxdb.yaml")
-    return set(doc["influxdb"]["include"]["entities"])
-
-
 def main() -> int:
-    esphome_ids, measurements = esphome_defined()
-    defined = esphome_ids | template_defined() | KNOWN_EXTERNAL
+    defined = esphome_defined() | template_defined() | KNOWN_EXTERNAL
     failures = []
 
     for entity, files in sorted(referenced().items()):
@@ -165,15 +146,6 @@ def main() -> int:
                 "     stale entry left behind after renaming/removing a node?"
             )
 
-    allowlist = influxdb_allowlist()
-    for entity in sorted(measurements - allowlist):
-        failures.append(
-            f"NOT FORWARDED: {entity} is an ESPHome measurement but is missing\n"
-            "  from packages/influxdb.yaml include.entities — its history will\n"
-            "  silently never reach InfluxDB/Grafana. Add it (or, if it is a new\n"
-            "  diagnostic, add its short name to DIAGNOSTIC_NAMES in this script)."
-        )
-
     if failures:
         print(f"entity drift check FAILED ({len(failures)} problem(s)):\n")
         print("\n\n".join(failures))
@@ -181,8 +153,7 @@ def main() -> int:
 
     print(
         f"entity drift check OK: {len(defined)} defined entities, "
-        f"{len(referenced())} referenced, "
-        f"{len(measurements)} measurements all forwarded to InfluxDB."
+        f"{len(referenced())} referenced entities all resolve."
     )
     return 0
 
