@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 from app.config import load_config
-from app.providers.sim import SimProvider
+from app.providers.sim import SimProvider, _c_to_f, _temperature
 
 CONFIG = load_config(Path(__file__).resolve().parent.parent.parent / "config.yaml")
 
@@ -31,10 +31,20 @@ def test_physical_bounds_over_a_day(sim):
             temp = sim._value(room.entities["temperature"], t)
             rh = sim._value(room.entities["humidity"], t)
             assert 380 <= co2 <= 2500, f"{room.id} co2={co2}"
-            assert 15 <= temp <= 30, f"{room.id} temp={temp}"
+            assert 59 <= temp <= 86, f"{room.id} temp={temp}"  # 15-30°C in °F
             assert 20 <= rh <= 80, f"{room.id} rh={rh}"
         pm = sim._value("sensor.kitchen_air_pm2_5", t)
         assert 0 <= pm <= 250
+
+
+def test_temperature_reported_in_fahrenheit(sim):
+    # Model runs in Celsius internally; the room entities report °F to match
+    # the real HA deployment (docs/09-roadmap.md unit-system decision).
+    now = time.time()
+    for room in CONFIG.rooms:
+        reported = sim._value(room.entities["temperature"], now)
+        expected = _c_to_f(_temperature(room.id, room.entities["temperature"], now))
+        assert reported == round(expected, 1)
 
 
 def test_dew_point_below_temperature(sim):

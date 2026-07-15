@@ -95,7 +95,7 @@ export function RoomCard({
         <footer className="mt-4 flex items-center gap-4 border-t border-hairline pt-3 text-sm text-ink-2">
           <span>
             <NumberTicker value={temp?.value ?? null} digits={1} />
-            <span className="text-muted"> °C</span>
+            <span className="text-muted"> °F</span>
           </span>
           <span>
             <NumberTicker value={rh?.value ?? null} digits={0} />
