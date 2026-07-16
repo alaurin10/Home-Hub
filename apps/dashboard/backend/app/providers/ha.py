@@ -179,7 +179,9 @@ def _downsample(rows: list[dict], points: int) -> list[dict]:
     width = (t1 - t0) / points or 1.0
     buckets: dict[int, list[dict]] = {}
     for r in numeric:
-        buckets.setdefault(int((r["t"] - t0) / width), []).append(r)
+        # The row at t == t1 would land in bucket `points`; clamp so the
+        # output never exceeds the requested point count.
+        buckets.setdefault(min(int((r["t"] - t0) / width), points - 1), []).append(r)
     return [
         {
             "t": sum(r["t"] for r in bucket) / len(bucket),

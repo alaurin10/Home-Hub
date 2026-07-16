@@ -108,7 +108,8 @@ body {
   backdrop-filter: blur(20px) saturate(170%);
   border: none;
   box-shadow: 0 12px 32px -16px rgba(0, 0, 0, 0.25);
-  transition: box-shadow 0.35s ease, background-color 0.35s ease;
+  /* 0.3s keeps the hover shadow in step with the card's hover spring (~300ms) */
+  transition: box-shadow 0.3s ease, background-color 0.3s ease;
 }
 
 .glass-chrome {

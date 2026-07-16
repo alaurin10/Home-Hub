@@ -14,8 +14,9 @@ export async function putLayout(layout: Layout): Promise<void> {
   });
 }
 
-export function getHistory(entities: string[], hours: number): Promise<HistoryResponse> {
+export function getHistory(entities: string[], hours: number, points?: number): Promise<HistoryResponse> {
   const params = new URLSearchParams({ entities: entities.join(","), hours: String(hours) });
+  if (points) params.set("points", String(points));
   return getJson(`/api/history?${params}`);
 }
 

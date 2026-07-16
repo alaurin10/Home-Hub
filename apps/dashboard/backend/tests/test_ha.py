@@ -7,7 +7,7 @@ from pathlib import Path
 import httpx
 
 from app.config import load_config
-from app.providers.ha import HAProvider
+from app.providers.ha import HAProvider, _downsample
 
 CONFIG = load_config(Path(__file__).resolve().parent.parent.parent / "config.yaml")
 
@@ -47,3 +47,15 @@ def test_recent_history_uses_last_changed_fallback(monkeypatch):
     series = asyncio.run(provider._recent_history([entity], hours=3, points=100))
 
     assert [row["v"] for row in series[entity]] == [600.0, 610.0, 615.0]
+
+
+def test_downsample_respects_point_budget():
+    # 1441 one-minute samples spanning exactly 24h: the final row sits at
+    # t == t1, which used to spill into an extra bucket (points + 1 total).
+    rows = [{"t": 1_000_000 + i * 60.0, "v": float(i)} for i in range(1441)]
+    out = _downsample(rows, points=288)
+    assert len(out) <= 288
+    # Buckets stay time-ordered and cover the full window.
+    ts = [r["t"] for r in out]
+    assert ts == sorted(ts)
+    assert ts[-1] > 1_000_000 + 1400 * 60.0

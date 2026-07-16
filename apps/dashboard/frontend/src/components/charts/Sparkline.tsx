@@ -21,11 +21,17 @@ export function Sparkline({
 
   useEffect(() => {
     let alive = true;
-    getHistory([entity], 3)
-      .then((h) => alive && setPoints(h.series[entity] ?? []))
-      .catch(() => alive && setPoints([]));
+    const load = () =>
+      getHistory([entity], 3)
+        .then((h) => alive && setPoints(h.series[entity] ?? []))
+        .catch(() => alive && setPoints([]));
+    void load();
+    // Refresh every 5 min so a card left on screen doesn't fossilize
+    // (cheap poll; live WS wiring isn't warranted for a context glyph).
+    const timer = setInterval(load, 5 * 60 * 1000);
     return () => {
       alive = false;
+      clearInterval(timer);
     };
   }, [entity]);
 
