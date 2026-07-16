@@ -31,7 +31,7 @@ jobs:
         id: changes
         run: ./scripts/deploy-esphome.sh detect
 
-      - name: Sync HA/Z2M/Grafana config + reload via HA API
+      - name: Sync HA/Z2M config + reload via HA API
         run: ./scripts/reload-ha.sh
         env:
           HA_BASE_URL: ${{ secrets.HA_BASE_URL }}

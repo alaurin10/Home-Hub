@@ -27,9 +27,9 @@
 - [ ] Accessory shows live AQ/CO2; test toggle flips HA ≤1 s.
 - [ ] Siri via HomePod; **on cellular, control works through the HomePod**.
 
-## Phase 4 — InfluxDB + Grafana
-- [ ] Influx Data Explorer shows points tagged by `entity_id`; Grafana updates.
-- [ ] A **non-allowlisted entity is absent** from Influx; LTS lists the sensor.
+## Phase 4 — removed (July 2026)
+~~InfluxDB + Grafana~~ — superseded by the custom dashboard app (`apps/dashboard/`);
+see its own test suite + `apps/dashboard/README.md` instead of a phase checklist here.
 
 ## Phase 5 — Zigbee independence
 - [ ] Restart **HA Core** → bulb returns **without re-pairing**.
@@ -48,8 +48,8 @@
 - [ ] Unplug a node → stale alert fires.
 - [ ] Backup exists locally **and** off-site; **restore drill** passes.
 - [ ] UPS → "on battery" → graceful shutdown.
-- [ ] On cellular: **Grafana opens via the Cloudflare URL (Access login)** and the
-      **HA Companion app works via Tailscale**.
+- [ ] On cellular: **the dashboard app opens via the Cloudflare URL (Access
+      login)** and the **HA Companion app works via Tailscale**.
 
 ## Phase 8 — auto-deploy
 - [ ] One-line edit pushed to `main` (e.g., from GitHub mobile) validates in cloud,
@@ -58,4 +58,5 @@
 
 ## End-to-end (integration)
 - [ ] Walk into office → motion turns on a Zigbee light → CO2 climbs → iPhone
-      notified → view the spike in Grafana → turn light off via Siri/HomePod.
+      notified → view the spike in the dashboard app → turn light off via
+      Siri/HomePod.

@@ -35,7 +35,7 @@ time:
   - platform: homeassistant
     id: homeassistant_time
 
-# Diagnostics every node reports (kept out of InfluxDB; recorder-excluded).
+# Diagnostics every node reports (recorder-excluded, see packages/recorder.yaml).
 # Entity names are short; the device-level `friendly_name` (set per node) is
 # prepended by HA → e.g. "Office Air Uptime" / entity_id sensor.office_air_uptime.
 sensor:

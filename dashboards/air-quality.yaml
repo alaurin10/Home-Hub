@@ -1,5 +1,5 @@
-# Air-quality detail view. Pairs HA-native cards with an embedded Grafana panel
-# for deep history (Grafana is embeddable into HA dashboards — see §10).
+# Air-quality detail view. HA-native at-a-glance cards; deep history/trends
+# live in the custom dashboard app (apps/dashboard/) instead — see §10.
 # Entities populate as each node is flashed (kitchen=full;
 # bedroom/living=SCD41). Per docs/01-naming-conventions.md.
 title: Air Quality
@@ -90,8 +90,3 @@ views:
           - sensor.kitchen_air_pm1_0
           - sensor.kitchen_air_pm2_5
           - sensor.kitchen_air_pm10
-
-      # Embed a Grafana panel (set the URL once Grafana is up, Phase 4):
-      # - type: iframe
-      #   url: http://localhost:3000/api/hassio_ingress/BV-WaL-ddA7snJgN6m1m2SZO_09aRJ1jeC-I7TmQp2M/goto/bfs3mjjckqbcwc?orgId=1
-      #   aspect_ratio: 50%
