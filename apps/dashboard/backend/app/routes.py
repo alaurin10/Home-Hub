@@ -30,7 +30,13 @@ async def get_config(request: Request):
     return {
         "house_name": cfg.house_name,
         "rooms": [
-            {"id": r.id, "name": r.name, "metrics": list(r.entities.keys()), "entities": r.entities}
+            {
+                "id": r.id,
+                "name": r.name,
+                "metrics": list(r.entities.keys()),
+                "entities": r.entities,
+                "node": r.node,
+            }
             for r in cfg.rooms
         ],
         "thresholds": cfg.thresholds,

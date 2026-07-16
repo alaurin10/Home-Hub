@@ -35,6 +35,7 @@ export interface RoomConfig {
   name: string;
   metrics: string[];
   entities: Record<string, string>;
+  node: Record<string, string>;
 }
 
 export interface Threshold {
