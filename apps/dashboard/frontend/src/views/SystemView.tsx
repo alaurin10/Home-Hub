@@ -1,6 +1,5 @@
-import { motion } from "framer-motion";
-
 import { NodeCard } from "../components/NodeCard";
+import { PageTransition } from "../components/PageTransition";
 import { useStore } from "../store";
 
 export function SystemView() {
@@ -11,7 +10,7 @@ export function SystemView() {
 
   return (
     <main className="mx-auto max-w-5xl px-5 pb-24 pt-4 md:pb-10">
-      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25 }}>
+      <PageTransition>
         <div className="mb-4 flex items-center justify-between">
           <h1 className="text-xl font-semibold tracking-tight text-ink">Sensor fleet</h1>
           <span className="inline-flex items-center gap-1.5 text-sm font-medium text-ink-2">
@@ -28,7 +27,7 @@ export function SystemView() {
             <NodeCard key={room.id} room={room} />
           ))}
         </div>
-      </motion.div>
+      </PageTransition>
     </main>
   );
 }

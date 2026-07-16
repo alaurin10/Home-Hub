@@ -107,6 +107,13 @@ async def get_history(
     return HistoryResponse(series=series, kind=kind)
 
 
+def _default_size(room) -> str:
+    # Sensor-rich rooms (particulates and more) get a wide card by default:
+    # with three rooms in a two-column grid, one wide + two regular composes
+    # a complete block instead of leaving a dangling card.
+    return "wide" if "pm2_5" in room.entities else "regular"
+
+
 @router.get("/layout", response_model=Layout)
 async def get_layout(request: Request):
     cfg = request.app.state.config
@@ -116,9 +123,11 @@ async def get_layout(request: Request):
         saved_ids = {c.id for c in saved.cards}
         # Rooms added to config.yaml after a layout was saved still show up
         cards = [c for c in saved.cards if c.id in {r.id for r in cfg.rooms}]
-        cards += [CardLayout(id=r.id) for r in cfg.rooms if r.id not in saved_ids]
+        cards += [
+            CardLayout(id=r.id, size=_default_size(r)) for r in cfg.rooms if r.id not in saved_ids
+        ]
         return Layout(cards=cards)
-    return Layout(cards=[CardLayout(id=r.id) for r in cfg.rooms])
+    return Layout(cards=[CardLayout(id=r.id, size=_default_size(r)) for r in cfg.rooms])
 
 
 @router.put("/layout", response_model=Layout)

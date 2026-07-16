@@ -12,7 +12,8 @@ import {
 } from "recharts";
 
 import type { HistoryPoint } from "../../api/types";
-import { clockLabel, formatValue } from "../../lib/format";
+import { formatValue, tickLabel, tooltipLabel } from "../../lib/format";
+import { timeTicks } from "../../lib/timeAxis";
 
 export interface Series {
   name: string;
@@ -35,6 +36,7 @@ export function TrendChart({
   unit = "",
   guides = [],
   area = true,
+  yDigits,
 }: {
   series: Series[];
   kind: "raw" | "stats";
@@ -43,27 +45,51 @@ export function TrendChart({
   unit?: string;
   guides?: number[];
   area?: boolean;
+  /** Y tick decimals; defaults to 1 when the plotted span is narrow (<5). */
+  yDigits?: number;
 }) {
   // Merge all series onto one time axis (rows keyed by bucketed timestamp)
-  const data = useMemo(() => {
+  const { data, span } = useMemo(() => {
     const rows = new Map<number, Record<string, number | null>>();
+    let lo = Infinity;
+    let hi = -Infinity;
     for (const s of series) {
       for (const p of s.points) {
         const key = Math.round(p.t);
         const row = rows.get(key) ?? { t: key };
+        const v = (kind === "raw" ? p.v : p.mean) ?? null;
+        if (v !== null) {
+          if (v < lo) lo = v;
+          if (v > hi) hi = v;
+        }
         if (kind === "raw") {
-          row[s.name] = p.v ?? null;
+          row[s.name] = v;
         } else {
-          row[s.name] = p.mean ?? null;
+          row[s.name] = v;
           row[`${s.name}·band`] = [p.min ?? null, p.max ?? null] as unknown as number;
         }
         rows.set(key, row);
       }
     }
-    return [...rows.values()].sort((a, b) => (a.t as number) - (b.t as number));
+    return {
+      data: [...rows.values()].sort((a, b) => (a.t as number) - (b.t as number)),
+      span: hi - lo,
+    };
   }, [series, kind]);
 
+  const ticks = useMemo(
+    () =>
+      data.length
+        ? timeTicks(data[0].t as number, data[data.length - 1].t as number, hours)
+        : undefined,
+    [data, hours],
+  );
+
   if (!data.length) return <div style={{ height }} className="animate-pulse rounded-xl bg-surface-2" />;
+
+  // Narrow-span series (a ~2°F temperature day) need a decimal or the Y
+  // axis repeats the same integer on every tick.
+  const digits = yDigits ?? (span < 5 ? 1 : 0);
 
   return (
     <ResponsiveContainer width="100%" height={height}>
@@ -81,17 +107,18 @@ export function TrendChart({
           dataKey="t"
           type="number"
           domain={["dataMin", "dataMax"]}
-          tickFormatter={(t: number) => clockLabel(t, hours)}
+          ticks={ticks}
+          tickFormatter={(t: number) => tickLabel(t, hours)}
           tickLine={false}
           axisLine={{ stroke: "var(--baseline)", strokeWidth: 1 }}
-          minTickGap={48}
+          minTickGap={32}
         />
         <YAxis
-          width={44}
+          width={48}
           tickLine={false}
           axisLine={false}
           domain={["auto", "auto"]}
-          tickFormatter={(v: number) => formatValue(v)}
+          tickFormatter={(v: number) => formatValue(v, digits)}
         />
         <Tooltip
           cursor={{ stroke: "var(--baseline)", strokeWidth: 1 }}
@@ -99,18 +126,33 @@ export function TrendChart({
             if (!active || !payload?.length) return null;
             return (
               <div className="glass-chrome rounded-xl px-3 py-2 text-xs">
-                <div className="mb-1 font-medium text-muted">{clockLabel(label as number, hours)}</div>
+                <div className="mb-1 font-medium text-muted">{tooltipLabel(label as number, kind)}</div>
                 {payload
                   .filter((p) => !String(p.dataKey).endsWith("·band"))
-                  .map((p) => (
-                    <div key={String(p.dataKey)} className="flex items-center gap-1.5 text-ink">
-                      <span aria-hidden className="h-2 w-2 rounded-full" style={{ background: p.stroke ?? p.color }} />
-                      <span className="text-ink-2">{String(p.dataKey)}</span>
-                      <span className="ml-auto pl-3 font-semibold">
-                        {formatValue(p.value as number, 1)} {unit}
-                      </span>
-                    </div>
-                  ))}
+                  .map((p) => {
+                    // For hourly stats, surface the min–max band next to the
+                    // mean so the shaded area is readable at the cursor.
+                    const band =
+                      kind === "stats"
+                        ? ((p.payload as Record<string, unknown>)[`${String(p.dataKey)}·band`] as
+                            | [number | null, number | null]
+                            | undefined)
+                        : undefined;
+                    return (
+                      <div key={String(p.dataKey)} className="flex items-center gap-1.5 text-ink">
+                        <span aria-hidden className="h-2 w-2 rounded-full" style={{ background: p.stroke ?? p.color }} />
+                        <span className="text-ink-2">{String(p.dataKey)}</span>
+                        <span className="ml-auto pl-3 font-semibold">
+                          {formatValue(p.value as number, 1)} {unit}
+                        </span>
+                        {band && band[0] !== null && band[1] !== null && (
+                          <span className="text-muted">
+                            {formatValue(band[0], 1)}–{formatValue(band[1], 1)}
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })}
               </div>
             );
           }}
@@ -153,8 +195,7 @@ export function TrendChart({
               strokeLinecap="round"
               fill={`url(#fill-${i})`}
               connectNulls
-              animationDuration={600}
-              animationBegin={0}
+              isAnimationActive={false}
               activeDot={{ r: 4, strokeWidth: 2, stroke: "var(--surface)" }}
               dot={false}
             />
@@ -166,8 +207,7 @@ export function TrendChart({
               strokeWidth={2}
               strokeLinecap="round"
               connectNulls
-              animationDuration={600}
-              animationBegin={0}
+              isAnimationActive={false}
               activeDot={{ r: 4, strokeWidth: 2, stroke: "var(--surface)" }}
               dot={false}
             />

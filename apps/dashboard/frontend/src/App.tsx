@@ -31,14 +31,28 @@ export default function App() {
     <div className="min-h-screen">
       <Header />
       <FleetBanner />
+      {/* Suspense lives inside each route element (not as AnimatePresence's
+          direct child) so the views' exit animations register with mode="wait". */}
       <AnimatePresence mode="wait">
-        <Suspense fallback={null}>
-          <Routes location={location} key={location.pathname}>
-            <Route path="/" element={<HomeView />} />
-            <Route path="/room/:id" element={<RoomView />} />
-            <Route path="/system" element={<SystemView />} />
-          </Routes>
-        </Suspense>
+        <Routes location={location} key={location.pathname}>
+          <Route path="/" element={<HomeView />} />
+          <Route
+            path="/room/:id"
+            element={
+              <Suspense fallback={null}>
+                <RoomView />
+              </Suspense>
+            }
+          />
+          <Route
+            path="/system"
+            element={
+              <Suspense fallback={null}>
+                <SystemView />
+              </Suspense>
+            }
+          />
+        </Routes>
       </AnimatePresence>
       <TabBar />
     </div>

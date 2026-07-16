@@ -24,10 +24,32 @@ export function humanDuration(seconds: number | null): string {
   return h > 0 ? `${h}h ${m}m` : `${m}m`;
 }
 
-export function clockLabel(ts: number, hours: number): string {
+function timeOfDay(date: Date): string {
+  // "6 AM" on the hour, "6:30 PM" otherwise — minutes only when they matter.
+  return date.toLocaleTimeString("en-US", {
+    hour: "numeric",
+    ...(date.getMinutes() !== 0 ? { minute: "2-digit" } : {}),
+  });
+}
+
+/** Axis tick label. Once the window crosses midnight the day must be
+ * readable: a 48h axis of bare clock times repeats and turns ambiguous. */
+export function tickLabel(ts: number, hours: number): string {
   const date = new Date(ts * 1000);
-  if (hours <= 48) {
-    return date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: false });
+  if (hours > 48) return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  if (hours > 24 && date.getHours() === 0 && date.getMinutes() === 0) {
+    return date.toLocaleDateString("en-US", { weekday: "short" });
   }
-  return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  return timeOfDay(date);
+}
+
+/** Tooltip header: always full day context, plus the stats bucket size. */
+export function tooltipLabel(ts: number, kind: "raw" | "stats"): string {
+  const date = new Date(ts * 1000);
+  const day = date.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+  if (kind === "stats") {
+    const hour = date.toLocaleTimeString("en-US", { hour: "numeric" });
+    return `${day} · ${hour} (hourly)`;
+  }
+  return `${day} · ${timeOfDay(date)}`;
 }
