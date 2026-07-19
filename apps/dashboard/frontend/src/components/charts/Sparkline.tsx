@@ -1,41 +1,23 @@
-import { useEffect, useState } from "react";
-
-import { getHistory } from "../../api/client";
 import type { HistoryPoint } from "../../api/types";
 
 /** Tiny 3h trend in the de-emphasis hue (muted ink, not a series color) —
  * context, not a chart: no axes, no tooltip. `minSpan` stops a flat signal's
- * noise being stretched to full height and read as volatility. */
+ * noise being stretched to full height and read as volatility. Purely
+ * presentational: points arrive via the Home view's batched history fetch. */
 export function Sparkline({
-  entity,
+  points,
   width = 120,
   height = 28,
   minSpan = 0,
+  stretch = false,
 }: {
-  entity: string;
-  width?: number;
+  points: HistoryPoint[] | null;
+  width?: number;   // coordinate-space width; rendered width when not stretching
   height?: number;
   minSpan?: number;
+  stretch?: boolean; // fill the container width (non-scaling stroke keeps the hairline true)
 }) {
-  const [points, setPoints] = useState<HistoryPoint[] | null>(null);
-
-  useEffect(() => {
-    let alive = true;
-    const load = () =>
-      getHistory([entity], 3)
-        .then((h) => alive && setPoints(h.series[entity] ?? []))
-        .catch(() => alive && setPoints([]));
-    void load();
-    // Refresh every 5 min so a card left on screen doesn't fossilize
-    // (cheap poll; live WS wiring isn't warranted for a context glyph).
-    const timer = setInterval(load, 5 * 60 * 1000);
-    return () => {
-      alive = false;
-      clearInterval(timer);
-    };
-  }, [entity]);
-
-  if (!points || points.length < 2) return <div style={{ width, height }} />;
+  if (!points || points.length < 2) return <div style={{ width: stretch ? "100%" : width, height }} />;
 
   const vs = points.map((p) => p.v ?? 0);
   let min = Math.min(...vs);
@@ -57,8 +39,23 @@ export function Sparkline({
     .join(" ");
 
   return (
-    <svg width={width} height={height} aria-hidden className="overflow-visible">
-      <path d={path} fill="none" stroke="var(--baseline)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    <svg
+      width={stretch ? "100%" : width}
+      height={height}
+      viewBox={`0 0 ${width} ${height}`}
+      preserveAspectRatio={stretch ? "none" : undefined}
+      aria-hidden
+      className="overflow-visible"
+    >
+      <path
+        d={path}
+        fill="none"
+        stroke="var(--baseline)"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        vectorEffect="non-scaling-stroke"
+      />
     </svg>
   );
 }

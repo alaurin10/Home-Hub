@@ -11,6 +11,9 @@ export interface NodeStatus {
   wifi_signal: number | null;
   uptime: number | null;
   last_seen: number | null;
+  esphome_version: string | null;
+  ip_address: string | null;
+  missing: string[];
 }
 
 export interface RoomSnapshot {
@@ -39,7 +42,8 @@ export interface RoomConfig {
 }
 
 export interface Threshold {
-  bounds: number[];
+  bounds?: number[];                                           // monotonic: [fair, poor, bad]
+  ranges?: Record<"good" | "fair" | "poor", [number, number]>; // band: outside poor = bad
   unit: string;
 }
 

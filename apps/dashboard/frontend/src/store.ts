@@ -16,6 +16,7 @@ interface Store {
   connected: boolean;
   editMode: boolean;
   ready: boolean;
+  initError: string | null;
 
   init: () => Promise<void>;
   setEditMode: (on: boolean) => void;
@@ -31,7 +32,10 @@ let entityIndex: Record<string, [string, string]> = {};
 // get their own index/patch path. "status" is deliberately excluded: the
 // online flag also depends on CO2 staleness (a 10-minute window), which is
 // evaluated server-side on each /api/rooms call — patching status alone
-// here would let the badge drift out of sync with that check.
+// here would let the badge drift out of sync with that check. The string
+// diagnostics (esphome_version/ip_address) are also left out: applyEvent
+// drops string values, and both effectively never change — the 60s
+// /api/rooms poll is plenty.
 let nodeEntityIndex: Record<string, [string, "wifi_signal" | "uptime"]> = {};
 
 export const useStore = create<Store>((set, get) => ({
@@ -41,13 +45,23 @@ export const useStore = create<Store>((set, get) => ({
   connected: false,
   editMode: false,
   ready: false,
+  initError: null,
 
   init: async () => {
-    const [config, rooms, layout] = await Promise.all([
-      getJson<AppConfig>("/api/config"),
-      getJson<RoomsResponse>("/api/rooms"),
-      getJson<Layout>("/api/layout"),
-    ]);
+    set({ initError: null });
+    let config: AppConfig, rooms: RoomsResponse, layout: Layout;
+    try {
+      [config, rooms, layout] = await Promise.all([
+        getJson<AppConfig>("/api/config"),
+        getJson<RoomsResponse>("/api/rooms"),
+        getJson<Layout>("/api/layout"),
+      ]);
+    } catch (err) {
+      // Return before the stream/poll start: a Retry that calls init() again
+      // can never stack a second WebSocket or interval.
+      set({ initError: err instanceof Error ? err.message : String(err) });
+      return;
+    }
     entityIndex = {};
     nodeEntityIndex = {};
     for (const room of config.rooms) {

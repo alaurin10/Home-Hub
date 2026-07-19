@@ -25,7 +25,14 @@ const ORDER: Status[] = ["good", "fair", "poor", "bad"];
 export function statusFor(config: AppConfig, metric: string, value: number | null): Status | null {
   const threshold = config.thresholds[metric];
   if (!threshold || value === null) return null;
-  const [fair, poor, bad] = threshold.bounds;
+  if (threshold.ranges) {
+    const within = ([lo, hi]: [number, number]) => value >= lo && value <= hi;
+    if (within(threshold.ranges.good)) return "good";
+    if (within(threshold.ranges.fair)) return "fair";
+    if (within(threshold.ranges.poor)) return "poor";
+    return "bad";
+  }
+  const [fair, poor, bad] = threshold.bounds ?? [];
   if (value >= bad) return "bad";
   if (value >= poor) return "poor";
   if (value >= fair) return "fair";

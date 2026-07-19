@@ -8,9 +8,10 @@ import { LegendRow, TrendChart, type Series } from "../components/charts/TrendCh
 import { Gauge } from "../components/Gauge";
 import { NumberTicker } from "../components/NumberTicker";
 import { PageTransition } from "../components/PageTransition";
+import { Skeleton } from "../components/Skeleton";
 import { StatTile } from "../components/StatTile";
 import { StatusChip } from "../components/StatusChip";
-import { METRIC_LABEL, roomStatus, statusFor } from "../lib/thresholds";
+import { METRIC_LABEL, roomStatus, statusFor, STATUS_COLOR, type Status } from "../lib/thresholds";
 import { useStore } from "../store";
 
 // Raw ranges (≤48h) carry a point budget sized to the window so bucket
@@ -73,6 +74,14 @@ function RangeSelector({ hours, onChange }: { hours: number; onChange: (h: numbe
   );
 }
 
+/** Compact status marker for section headers (paired with the value beside it). */
+function StatusDot({ status }: { status: Status | null }) {
+  if (!status) return null;
+  return (
+    <span aria-hidden className="h-1.5 w-1.5 rounded-full" style={{ background: STATUS_COLOR[status] }} />
+  );
+}
+
 export function RoomView() {
   const { id } = useParams();
   const { config, rooms } = useStore();
@@ -83,6 +92,8 @@ export function RoomView() {
   const [loaded, setLoaded] = useState<{ roomId: string; hours: number; resp: HistoryResponse } | null>(
     null,
   );
+  const [failed, setFailed] = useState(false);
+  const [retryKey, setRetryKey] = useState(0);
 
   const roomCfg = config?.rooms.find((r) => r.id === id);
   const room = rooms?.rooms.find((r) => r.id === id);
@@ -90,15 +101,16 @@ export function RoomView() {
   useEffect(() => {
     if (!roomCfg) return;
     let alive = true;
+    setFailed(false);
     const entities = Object.values(roomCfg.entities);
     const points = RANGES.find((r) => r.hours === hours)?.points;
-    getHistory(entities, hours, points).then(
-      (resp) => alive && setLoaded({ roomId: roomCfg.id, hours, resp }),
-    );
+    getHistory(entities, hours, points)
+      .then((resp) => alive && setLoaded({ roomId: roomCfg.id, hours, resp }))
+      .catch(() => alive && setFailed(true));
     return () => {
       alive = false;
     };
-  }, [roomCfg, hours]);
+  }, [roomCfg, hours, retryKey]);
 
   const history = loaded && loaded.roomId === roomCfg?.id ? loaded.resp : null;
   // Label/format charts by the range actually plotted, not the pending one.
@@ -116,7 +128,27 @@ export function RoomView() {
     [roomCfg, history],
   );
 
-  if (!config || !room || !roomCfg) return null;
+  if (!config || !rooms)
+    return (
+      <main className="mx-auto max-w-5xl px-5 pb-24 pt-4 md:pb-10">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <Skeleton className="h-64" />
+          <Skeleton className="h-64" />
+        </div>
+        <Skeleton className="mt-4 h-72" />
+      </main>
+    );
+  if (!room || !roomCfg)
+    return (
+      <main className="mx-auto max-w-5xl px-5 pb-24 pt-4 md:pb-10">
+        <div className="glass rounded-3xl p-8 text-center">
+          <p className="text-sm text-ink-2">Room not found.</p>
+          <Link to="/" className="glass-chrome mt-4 inline-block rounded-full px-4 py-1.5 text-sm font-medium text-ink-2">
+            Back to home
+          </Link>
+        </div>
+      </main>
+    );
 
   const kind = history?.kind ?? "raw";
   const co2 = seriesFor("co2", "var(--series-1)");
@@ -155,16 +187,33 @@ export function RoomView() {
 
         <RangeSelector hours={hours} onChange={setHours} />
 
+        {failed && (
+          <div className="glass mb-4 flex items-center justify-between rounded-3xl p-4" role="alert">
+            <p className="text-sm text-ink-2">
+              <span aria-hidden>⚠ </span>Couldn't load history for this range.
+            </p>
+            <button
+              onClick={() => setRetryKey((k) => k + 1)}
+              className="glass-chrome rounded-full px-3 py-1 text-xs font-medium text-ink-2"
+            >
+              Retry
+            </button>
+          </div>
+        )}
+
         {/* Comfort first: temperature + humidity lead, matching the cards. */}
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <section className="glass rounded-3xl p-5">
             <header className="mb-2 flex items-baseline justify-between">
               <h2 className="text-sm font-semibold text-ink">Temperature</h2>
-              <div className="text-sm text-ink-2">
-                <span className="text-xl font-semibold text-ink">
-                  <NumberTicker value={room.metrics.temperature?.value ?? null} digits={1} />
-                </span>{" "}
-                °F now
+              <div className="flex items-center gap-2 text-sm text-ink-2">
+                <StatusDot status={statusFor(config, "temperature", room.metrics.temperature?.value ?? null)} />
+                <span>
+                  <span className="text-xl font-semibold text-ink">
+                    <NumberTicker value={room.metrics.temperature?.value ?? null} digits={1} />
+                  </span>{" "}
+                  °F now
+                </span>
               </div>
             </header>
             <TrendChart
@@ -178,28 +227,22 @@ export function RoomView() {
           <section className="glass rounded-3xl p-5">
             <header className="mb-2 flex items-baseline justify-between">
               <h2 className="text-sm font-semibold text-ink">Humidity</h2>
-              <div className="text-sm text-ink-2">
-                <span className="text-xl font-semibold text-ink">
-                  <NumberTicker value={room.metrics.humidity?.value ?? null} digits={0} />
-                </span>{" "}
-                % now
+              <div className="flex items-center gap-2 text-sm text-ink-2">
+                <StatusDot status={statusFor(config, "humidity", room.metrics.humidity?.value ?? null)} />
+                <span>
+                  <span className="text-xl font-semibold text-ink">
+                    <NumberTicker value={room.metrics.humidity?.value ?? null} digits={0} />
+                  </span>{" "}
+                  % now
+                </span>
               </div>
             </header>
             <TrendChart series={rh ? [rh] : []} kind={kind} hours={plottedHours} height={200} unit="%" />
           </section>
         </div>
 
-        <div className="mt-4 grid grid-cols-2 gap-4">
-          <StatTile
-            label="Dew point"
-            value={dew?.value ?? null}
-            unit="°F"
-            // 60.8°F = 16°C, the muggy threshold
-            note={dew?.value !== null && dew !== undefined && dew.value! > 60.8 ? "muggy" : "comfortable"}
-          />
-          <StatTile label="Absolute humidity" value={abs?.value ?? null} unit="g/m³" />
-        </div>
-
+        {/* CO₂ directly after the comfort pair: the reading that decides
+            "open a window" shouldn't hide below derived tiles. */}
         <section className="mt-4 glass rounded-3xl p-5">
           <header className="mb-2 flex items-center justify-between">
             <h2 className="text-sm font-semibold text-ink">CO₂</h2>
@@ -207,7 +250,7 @@ export function RoomView() {
               <StatusChip status={statusFor(config, "co2", room.metrics.co2?.value ?? null)} />
               <Gauge
                 value={room.metrics.co2?.value ?? null}
-                bounds={config.thresholds.co2.bounds}
+                bounds={config.thresholds.co2.bounds ?? []}
                 size={72}
                 status={statusFor(config, "co2", room.metrics.co2?.value ?? null)}
               >
@@ -224,9 +267,20 @@ export function RoomView() {
             hours={plottedHours}
             height={240}
             unit="ppm"
-            guides={config.thresholds.co2.bounds.slice(0, 2)}
+            guides={(config.thresholds.co2.bounds ?? []).slice(0, 2)}
           />
         </section>
+
+        <div className="mt-4 grid grid-cols-2 gap-4">
+          <StatTile
+            label="Dew point"
+            value={dew?.value ?? null}
+            unit="°F"
+            // 60.8°F = 16°C, the muggy threshold
+            note={dew?.value !== null && dew !== undefined && dew.value! > 60.8 ? "muggy" : "comfortable"}
+          />
+          <StatTile label="Absolute humidity" value={abs?.value ?? null} unit="g/m³" />
+        </div>
 
         {pmSeries.length > 0 && (
           <section className="mt-4 glass rounded-3xl p-5">

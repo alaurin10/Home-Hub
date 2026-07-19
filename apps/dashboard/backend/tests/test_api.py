@@ -22,6 +22,7 @@ def test_config_shape(tmp_path):
         assert cfg["mode"] == "demo"
         assert {r["id"] for r in cfg["rooms"]} == {"kitchen", "bedroom", "living"}
         assert "co2" in cfg["thresholds"]
+        assert cfg["thresholds"]["temperature"]["ranges"]["good"] == [67, 75]
 
 
 def test_rooms_snapshot(tmp_path):
@@ -32,7 +33,24 @@ def test_rooms_snapshot(tmp_path):
         assert kitchen["metrics"]["co2"]["value"] > 0
         assert kitchen["metrics"]["pm2_5"]["unit"] == "µg/m³"
         assert kitchen["node"]["online"] is True
+        assert kitchen["node"]["esphome_version"] == "2025.6.3"
+        assert kitchen["node"]["ip_address"].startswith("192.168.1.")
+        assert kitchen["node"]["missing"] == []
         assert data["fleet"]["problem"] is False
+
+
+def test_missing_entities_diagnostic(tmp_path, monkeypatch):
+    from app import settings
+
+    monkeypatch.setattr(settings, "SIM_FAULT", "bedroom")
+    with make_client(tmp_path) as client:
+        data = client.get("/api/rooms").json()
+        bedroom = next(r for r in data["rooms"] if r["id"] == "bedroom")
+        assert bedroom["node"]["online"] is False
+        assert "sensor.bedroom_air_co2" in bedroom["node"]["missing"]
+        assert "sensor.bedroom_air_wifi_signal" in bedroom["node"]["missing"]
+        kitchen = next(r for r in data["rooms"] if r["id"] == "kitchen")
+        assert kitchen["node"]["missing"] == []
 
 
 def test_history_short_and_long(tmp_path):

@@ -74,6 +74,13 @@ def test_long_history_is_hourly_stats(sim):
         assert r["min"] <= r["mean"] <= r["max"]
 
 
+def test_node_text_sensors(sim):
+    states = asyncio.run(sim.snapshot())
+    for room in CONFIG.rooms:
+        assert isinstance(states[room.node["esphome_version"]]["value"], str)
+        assert isinstance(states[room.node["ip_address"]]["value"], str)
+
+
 def test_deterministic_model(sim):
     t = time.time() - 3600
     a = sim._value("sensor.living_air_co2", t)
