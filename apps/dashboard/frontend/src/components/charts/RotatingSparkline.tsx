@@ -6,19 +6,18 @@ import { Sparkline } from "./Sparkline";
 
 export interface SparklineSlot {
   metric: string;
+  label: string;
   points: HistoryPoint[] | null;
   minSpan: number;
-  color: string; // the metric's status color — the line IS the label
 }
 
 const ROTATE_MS = 4000;
+const LABEL_H = 12; // reserved under the curve so the metric label never clips
 
-/** Sparkline that cycles through metrics with a crossfade. No text label:
- * the stroke takes the current metric's status-dot color, so the line pairs
- * with its caption dot. The index derives from the wall clock, so every card
- * on the grid flips in unison instead of drifting apart by mount time.
- * Reduced motion pins to the first slot — auto-cycling content is exactly
- * what those users opted out of. */
+/** Sparkline that cycles through metrics with a crossfade. The index derives
+ * from the wall clock, so every card on the grid flips in unison instead of
+ * drifting apart by mount time. Reduced motion pins to the first slot —
+ * auto-cycling content is exactly what those users opted out of. */
 export function RotatingSparkline({
   slots,
   width = 120,
@@ -50,7 +49,7 @@ export function RotatingSparkline({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reduced, live.length]);
 
-  const boxStyle = { width: stretch ? undefined : width, height };
+  const boxStyle = { width: stretch ? undefined : width, height: height + LABEL_H };
   if (!live.length) return <div className={stretch ? "w-full" : ""} style={boxStyle} />;
   const slot = live[reduced ? 0 : index % live.length];
 
@@ -67,14 +66,10 @@ export function RotatingSparkline({
           exit={{ opacity: 0 }}
           transition={{ duration: 0.35 }}
         >
-          <Sparkline
-            points={slot.points}
-            width={width}
-            height={height}
-            minSpan={slot.minSpan}
-            stroke={slot.color}
-            stretch={stretch}
-          />
+          <Sparkline points={slot.points} width={width} height={height} minSpan={slot.minSpan} stretch={stretch} />
+          <div className="absolute bottom-0 right-0 text-[10px] font-medium leading-none text-muted">
+            {slot.label}
+          </div>
         </motion.div>
       </AnimatePresence>
     </div>

@@ -10,14 +10,12 @@ export function Sparkline({
   height = 28,
   minSpan = 0,
   stretch = false,
-  stroke = "var(--baseline)",
 }: {
   points: HistoryPoint[] | null;
   width?: number;   // coordinate-space width; rendered width when not stretching
   height?: number;
   minSpan?: number;
   stretch?: boolean; // fill the container width (non-scaling stroke keeps the hairline true)
-  stroke?: string;
 }) {
   if (!points || points.length < 2) return <div style={{ width: stretch ? "100%" : width, height }} />;
 
@@ -52,7 +50,7 @@ export function Sparkline({
       <path
         d={path}
         fill="none"
-        stroke={stroke}
+        stroke="var(--baseline)"
         strokeWidth="1.5"
         strokeLinecap="round"
         strokeLinejoin="round"
