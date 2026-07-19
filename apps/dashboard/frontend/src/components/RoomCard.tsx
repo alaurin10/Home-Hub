@@ -152,20 +152,8 @@ export function RoomCard({
                   Humidity
                 </MetricCaption>
               </div>
-              {/* Label beside the arc (not below) so the block matches the
-                  humidity block's height and the row reads as one line. */}
-              <div className="flex items-center gap-1.5">
-                <Gauge
-                  value={co2?.value ?? null}
-                  bounds={config.thresholds.co2.bounds ?? []}
-                  size={48}
-                  status={co2Status}
-                >
-                  <span className="text-[11px] font-semibold leading-none text-ink">
-                    <NumberTicker value={co2?.value ?? null} />
-                  </span>
-                  <span className="mt-px text-[7px] font-medium text-muted">ppm</span>
-                </Gauge>
+              {/* Label to the left of the arc; the row reads as one line. */}
+              <div className="flex items-center gap-2">
                 <div className="text-xs leading-tight text-muted">
                   <div className="flex items-center gap-1.5">
                     {co2Status && (
@@ -178,6 +166,23 @@ export function RoomCard({
                     CO₂
                   </div>
                   {co2Status && co2Status !== "good" && <div className="mt-0.5">ventilate</div>}
+                </div>
+                {/* The 240° arc leaves the bottom of its square box empty, so
+                    a 64px gauge draws a ~48px glyph — the humidity block's
+                    height. Trim the box's dead space so alignment tracks the
+                    visible arc, not the square. */}
+                <div className="-mt-px -mb-[15px]">
+                  <Gauge
+                    value={co2?.value ?? null}
+                    bounds={config.thresholds.co2.bounds ?? []}
+                    size={64}
+                    status={co2Status}
+                  >
+                    <span className="text-[13px] font-semibold leading-none text-ink">
+                      <NumberTicker value={co2?.value ?? null} />
+                    </span>
+                    <span className="mt-0.5 text-[8px] font-medium text-muted">ppm</span>
+                  </Gauge>
                 </div>
               </div>
             </div>
