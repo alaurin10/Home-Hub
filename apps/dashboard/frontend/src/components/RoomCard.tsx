@@ -21,10 +21,10 @@ function preloadRoomView() {
 }
 
 // minSpan per metric keeps a flat night from rendering as noise (see Sparkline).
-const SPARK_SLOTS: { metric: string; label: string; minSpan: number }[] = [
-  { metric: "temperature", label: "Temperature", minSpan: 2 },
-  { metric: "humidity", label: "Humidity", minSpan: 4 },
-  { metric: "co2", label: "CO₂", minSpan: 80 },
+const SPARK_SLOTS: { metric: string; minSpan: number }[] = [
+  { metric: "temperature", minSpan: 2 },
+  { metric: "humidity", minSpan: 4 },
+  { metric: "co2", minSpan: 80 },
 ];
 
 /** Caption under a reading: status dot + label (never color alone). */
@@ -68,10 +68,15 @@ export function RoomCard({
   const co2Status = statusFor(config, "co2", co2?.value ?? null);
 
   const open = () => !editMode && navigate(`/room/${room.id}`);
-  const slots = SPARK_SLOTS.map((s) => ({
-    ...s,
-    points: history?.[roomCfg.entities[s.metric]] ?? null,
-  }));
+  // Stroke matches the metric's caption dot, so color says which trend is up.
+  const slots = SPARK_SLOTS.map((s) => {
+    const st = statusFor(config, s.metric, room.metrics[s.metric]?.value ?? null);
+    return {
+      ...s,
+      points: history?.[roomCfg.entities[s.metric]] ?? null,
+      color: st ? STATUS_COLOR[st] : "var(--baseline)",
+    };
+  });
 
   return (
     <div
