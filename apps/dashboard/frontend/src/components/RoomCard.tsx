@@ -125,9 +125,11 @@ export function RoomCard({
           )}
         </header>
 
-        {/* Comfort first: temperature leads; humidity and CO₂ ride beside it. */}
-        <div className="mt-4 flex flex-wrap items-end gap-x-5 gap-y-3">
-          <div>
+        {/* Temperature is the hero; humidity and CO₂ (with its arc meter —
+            band position reads faster than the bare number) share the row
+            below; the trend rides the right side of the card. */}
+        <div className="mt-4 flex flex-wrap items-end justify-between gap-x-5 gap-y-3">
+          <div className="shrink-0">
             <div className="text-[40px] font-semibold leading-none tracking-tight text-ink">
               <NumberTicker value={temp?.value ?? null} digits={1} />
               <span className="ml-0.5 text-lg font-medium text-muted">°F</span>
@@ -135,41 +137,49 @@ export function RoomCard({
             <MetricCaption status={statusFor(config, "temperature", temp?.value ?? null)}>
               Temperature
             </MetricCaption>
-          </div>
-          <div>
-            <div className="text-[26px] font-semibold leading-none tracking-tight text-ink-2">
-              <NumberTicker value={rh?.value ?? null} digits={0} />
-              <span className="ml-0.5 text-sm font-medium text-muted">%</span>
+            <div className="mt-3 flex items-center gap-4">
+              <div>
+                <div className="text-[26px] font-semibold leading-none tracking-tight text-ink-2">
+                  <NumberTicker value={rh?.value ?? null} digits={0} />
+                  <span className="ml-0.5 text-sm font-medium text-muted">%</span>
+                </div>
+                <MetricCaption status={statusFor(config, "humidity", rh?.value ?? null)}>
+                  Humidity
+                </MetricCaption>
+              </div>
+              {/* Label beside the arc (not below) so the block matches the
+                  humidity block's height and the row reads as one line. */}
+              <div className="flex items-center gap-1.5">
+                <Gauge
+                  value={co2?.value ?? null}
+                  bounds={config.thresholds.co2.bounds ?? []}
+                  size={48}
+                  status={co2Status}
+                >
+                  <span className="text-[11px] font-semibold leading-none text-ink">
+                    <NumberTicker value={co2?.value ?? null} />
+                  </span>
+                  <span className="mt-px text-[7px] font-medium text-muted">ppm</span>
+                </Gauge>
+                <div className="text-xs leading-tight text-muted">
+                  <div className="flex items-center gap-1.5">
+                    {co2Status && (
+                      <span
+                        aria-hidden
+                        className="h-1.5 w-1.5 rounded-full"
+                        style={{ background: STATUS_COLOR[co2Status] }}
+                      />
+                    )}
+                    CO₂
+                  </div>
+                  {co2Status && co2Status !== "good" && <div className="mt-0.5">ventilate</div>}
+                </div>
+              </div>
             </div>
-            <MetricCaption status={statusFor(config, "humidity", rh?.value ?? null)}>
-              Humidity
-            </MetricCaption>
           </div>
-          {/* CO₂ keeps its arc meter: where the value sits between the bands
-              reads faster than the bare number. */}
-          <div>
-            <Gauge
-              value={co2?.value ?? null}
-              bounds={config.thresholds.co2.bounds ?? []}
-              size={56}
-              status={co2Status}
-            >
-              <span className="text-[13px] font-semibold leading-none text-ink">
-                <NumberTicker value={co2?.value ?? null} />
-              </span>
-              <span className="mt-0.5 text-[8px] font-medium text-muted">ppm</span>
-            </Gauge>
-            <MetricCaption status={co2Status}>
-              CO₂
-              {co2Status && co2Status !== "good" && <span className="text-ink-2"> · ventilate</span>}
-            </MetricCaption>
+          <div className="min-w-[120px] flex-1">
+            <RotatingSparkline slots={slots} height={size === "wide" ? 48 : 40} stretch />
           </div>
-        </div>
-
-        {/* The freed footer space hosts the trend: one sparkline rotating
-            through the metrics above (label crossfades with its curve). */}
-        <div className="mt-4">
-          <RotatingSparkline slots={slots} height={size === "wide" ? 40 : 28} stretch />
         </div>
 
         <AirChips room={room} config={config} />
