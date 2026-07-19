@@ -57,6 +57,31 @@ def _validate_threshold(metric: str, threshold: dict) -> None:
         raise ValueError(f"threshold '{metric}': ranges must nest good within fair within poor")
 
 
+def build_effective_thresholds(defaults: dict[str, dict], overrides: dict[str, dict]) -> dict[str, dict]:
+    """Merge user overrides over the config.yaml defaults. An override supplies
+    only the numeric shape (ranges/bounds) for a metric; the unit is always
+    taken from config, and the override must keep the metric's existing shape
+    (a `ranges` metric stays `ranges`). The merged result is validated, so a
+    bad override raises ValueError instead of poisoning the served config."""
+    effective = {metric: dict(threshold) for metric, threshold in defaults.items()}
+    for metric, override in overrides.items():
+        default = defaults.get(metric)
+        if default is None:
+            raise ValueError(f"threshold '{metric}': not a configured metric")
+        merged = {"unit": default.get("unit", "")}
+        if "ranges" in default:
+            if "ranges" not in override:
+                raise ValueError(f"threshold '{metric}': expected band ranges, not bounds")
+            merged["ranges"] = override["ranges"]
+        else:
+            if "bounds" not in override:
+                raise ValueError(f"threshold '{metric}': expected bounds, not ranges")
+            merged["bounds"] = override["bounds"]
+        _validate_threshold(metric, merged)
+        effective[metric] = merged
+    return effective
+
+
 def load_config(path: Path) -> AppConfig:
     raw = yaml.safe_load(path.read_text(encoding="utf-8"))
     rooms = [

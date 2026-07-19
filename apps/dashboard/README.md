@@ -14,6 +14,10 @@ frontend (Vite, Tailwind CSS 4, Framer Motion, Recharts, dnd-kit).
 - **Drag-and-drop layout**: an Edit mode lets you reorder and resize room
   cards; the layout persists server-side (`data/layout.json`) — no source
   edits, no accounts (single-household, layout is global).
+- **Editable comfort bands**: the header's gear opens a settings dialog to tune
+  the temperature and humidity Good/Fair/Poor bands live; overrides persist
+  server-side (`data/thresholds.json`) and layer over the `config.yaml`
+  defaults, so un-tuned metrics keep tracking config.
 - **No app-level auth by design**: the HA token lives server-side only, and
   remote access rides the LAN → Tailscale / Cloudflare Access posture from
   `docs/00-architecture.md` §10. Never port-forward this app.
@@ -75,6 +79,11 @@ anything.
 air-quality thresholds that drive every signal color. Add a room there and the
 UI grows a card — the frontend renders entirely from `/api/config`.
 
+Temperature and humidity comfort bands are also tunable at runtime from the
+dashboard (the header gear → **Comfort settings**). Those overrides are saved to
+`data/thresholds.json` and merged over the `config.yaml` defaults on every
+start; delete that file to fall back to config.
+
 ## API
 
 | Route | Purpose |
@@ -83,6 +92,7 @@ UI grows a card — the frontend renders entirely from `/api/config`.
 | `GET /api/rooms` | current snapshot + fleet health |
 | `GET /api/history?entities=&hours=&points=` | ≤48 h: raw points; >48 h: hourly mean/min/max |
 | `GET/PUT /api/layout` | persisted card order/size (drag-and-drop backing store) |
+| `GET/PUT /api/thresholds` | effective + default comfort bands; PUT persists overrides |
 | `WS /api/stream` | live state pushes |
 | `GET /api/health` | mode + liveness |
 

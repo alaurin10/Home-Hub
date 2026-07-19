@@ -12,9 +12,9 @@ from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from . import settings
-from .config import load_config
+from .config import build_effective_thresholds, load_config
 from .providers.sim import SimProvider
-from .routes import router
+from .routes import load_threshold_overrides, router
 from .stream import hub
 
 
@@ -28,6 +28,16 @@ async def lifespan(app: FastAPI):
 
 def create_app() -> FastAPI:
     config = load_config(settings.CONFIG_PATH)
+    # Comfort bands are user-tunable at runtime (PUT /api/thresholds). The
+    # pristine config.yaml values stay as `default_thresholds` (for reset);
+    # config.thresholds becomes the effective set the whole app serves.
+    default_thresholds = {metric: dict(t) for metric, t in config.thresholds.items()}
+    try:
+        config.thresholds = build_effective_thresholds(default_thresholds, load_threshold_overrides())
+    except (ValueError, TypeError, KeyError):
+        # A stale/incompatible override file must never break startup —
+        # fall back to config defaults and let the user re-save.
+        config.thresholds = default_thresholds
     if settings.DEMO_MODE:
         provider = SimProvider(config)
     else:
@@ -38,6 +48,7 @@ def create_app() -> FastAPI:
 
     app = FastAPI(title="Home-Hub Dashboard", lifespan=lifespan)
     app.state.config = config
+    app.state.default_thresholds = default_thresholds
     app.state.provider = provider
     app.add_middleware(
         CORSMiddleware,

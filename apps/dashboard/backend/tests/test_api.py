@@ -90,3 +90,54 @@ def test_layout_roundtrip(tmp_path):
 
         bad = {"cards": [{"id": "garage", "size": "regular"}]}
         assert client.put("/api/layout", json=bad).status_code == 400
+
+
+def test_thresholds_get_exposes_defaults(tmp_path):
+    with make_client(tmp_path) as client:
+        data = client.get("/api/thresholds").json()
+        assert data["thresholds"]["temperature"]["ranges"]["good"] == [67, 75]
+        assert data["defaults"]["humidity"]["ranges"]["good"] == [35, 55]
+
+
+def test_thresholds_override_roundtrip(tmp_path):
+    with make_client(tmp_path) as client:
+        new = {"thresholds": {"humidity": {"ranges": {"good": [40, 50], "fair": [35, 55], "poor": [30, 60]}}}}
+        resp = client.put("/api/thresholds", json=new)
+        assert resp.status_code == 200
+        body = resp.json()
+        # Effective picks up the override; the config-owned unit is preserved.
+        assert body["thresholds"]["humidity"]["ranges"]["good"] == [40, 50]
+        assert body["thresholds"]["humidity"]["unit"] == "%"
+        # Defaults still report the pristine config value (for reset).
+        assert body["defaults"]["humidity"]["ranges"]["good"] == [35, 55]
+        # /api/config now serves the tuned bands, so the UI recolors.
+        assert client.get("/api/config").json()["thresholds"]["humidity"]["ranges"]["good"] == [40, 50]
+
+
+def test_thresholds_override_persists_across_restart(tmp_path):
+    with make_client(tmp_path) as client:
+        new = {"thresholds": {"temperature": {"ranges": {"good": [68, 74], "fair": [65, 77], "poor": [60, 82]}}}}
+        assert client.put("/api/thresholds", json=new).status_code == 200
+    # A fresh app instance (same DATA_DIR) reloads the saved override at startup.
+    with make_client(tmp_path) as client:
+        got = client.get("/api/thresholds").json()
+        assert got["thresholds"]["temperature"]["ranges"]["good"] == [68, 74]
+
+
+def test_thresholds_reject_non_nested_ranges(tmp_path):
+    with make_client(tmp_path) as client:
+        bad = {"thresholds": {"humidity": {"ranges": {"good": [30, 60], "fair": [35, 55], "poor": [40, 50]}}}}
+        assert client.put("/api/thresholds", json=bad).status_code == 400
+
+
+def test_thresholds_reject_unknown_metric(tmp_path):
+    with make_client(tmp_path) as client:
+        bad = {"thresholds": {"loudness": {"bounds": [1, 2, 3]}}}
+        assert client.put("/api/thresholds", json=bad).status_code == 400
+
+
+def test_thresholds_reject_wrong_shape(tmp_path):
+    with make_client(tmp_path) as client:
+        # temperature is band-shaped (ranges); bounds must be refused.
+        bad = {"thresholds": {"temperature": {"bounds": [60, 70, 80]}}}
+        assert client.put("/api/thresholds", json=bad).status_code == 400

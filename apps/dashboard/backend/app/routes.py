@@ -7,6 +7,7 @@ import time
 from fastapi import APIRouter, HTTPException, Query, Request, WebSocket, WebSocketDisconnect
 
 from . import settings
+from .config import build_effective_thresholds
 from .models import (
     CardLayout,
     FleetStatus,
@@ -16,6 +17,7 @@ from .models import (
     NodeStatus,
     RoomsResponse,
     RoomSnapshot,
+    ThresholdsUpdate,
 )
 from .stream import hub
 
@@ -160,6 +162,48 @@ async def put_layout(request: Request, layout: Layout):
     settings.DATA_DIR.mkdir(parents=True, exist_ok=True)
     (settings.DATA_DIR / "layout.json").write_text(layout.model_dump_json(), encoding="utf-8")
     return layout
+
+
+THRESHOLDS_FILE = "thresholds.json"
+
+
+def load_threshold_overrides() -> dict:
+    """Saved comfort-band overrides, or {} when the user hasn't tuned any.
+    Called at startup (main) and by the PUT/GET handlers below."""
+    path = settings.DATA_DIR / THRESHOLDS_FILE
+    if path.exists():
+        return json.loads(path.read_text(encoding="utf-8"))
+    return {}
+
+
+@router.get("/thresholds")
+async def get_thresholds(request: Request):
+    # `thresholds` is what the UI paints with (defaults + overrides); `defaults`
+    # lets the editor offer a per-metric "reset to default".
+    return {
+        "thresholds": request.app.state.config.thresholds,
+        "defaults": request.app.state.default_thresholds,
+    }
+
+
+@router.put("/thresholds")
+async def put_thresholds(request: Request, update: ThresholdsUpdate):
+    defaults = request.app.state.default_thresholds
+    try:
+        effective = build_effective_thresholds(defaults, update.thresholds)
+    except (ValueError, TypeError, KeyError) as exc:
+        raise HTTPException(400, str(exc))
+    # Persist only the numeric shape, so un-tuned metrics keep tracking
+    # config.yaml even if its defaults change later.
+    sanitized = {
+        metric: ({"ranges": effective[metric]["ranges"]} if "ranges" in effective[metric]
+                 else {"bounds": effective[metric]["bounds"]})
+        for metric in update.thresholds
+    }
+    settings.DATA_DIR.mkdir(parents=True, exist_ok=True)
+    (settings.DATA_DIR / THRESHOLDS_FILE).write_text(json.dumps(sanitized), encoding="utf-8")
+    request.app.state.config.thresholds = effective
+    return {"thresholds": effective, "defaults": defaults}
 
 
 @router.get("/health")

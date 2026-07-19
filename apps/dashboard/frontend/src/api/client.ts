@@ -1,4 +1,10 @@
-import type { HistoryResponse, Layout, StateEvent } from "./types";
+import type {
+  HistoryResponse,
+  Layout,
+  StateEvent,
+  ThresholdShape,
+  ThresholdsResponse,
+} from "./types";
 
 export async function getJson<T>(path: string): Promise<T> {
   const resp = await fetch(path);
@@ -12,6 +18,24 @@ export async function putLayout(layout: Layout): Promise<void> {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(layout),
   });
+}
+
+export function getThresholds(): Promise<ThresholdsResponse> {
+  return getJson<ThresholdsResponse>("/api/thresholds");
+}
+
+/** Persist comfort-band overrides. Rejects (with the server's message) when a
+ * band fails validation, so the caller can surface it. */
+export async function putThresholds(
+  thresholds: Record<string, ThresholdShape>,
+): Promise<ThresholdsResponse> {
+  const resp = await fetch("/api/thresholds", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ thresholds }),
+  });
+  if (!resp.ok) throw new Error((await resp.text()) || `PUT /api/thresholds: ${resp.status}`);
+  return resp.json();
 }
 
 export function getHistory(entities: string[], hours: number, points?: number): Promise<HistoryResponse> {
