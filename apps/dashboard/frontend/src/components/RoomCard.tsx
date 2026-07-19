@@ -125,76 +125,70 @@ export function RoomCard({
           )}
         </header>
 
-        {/* Temperature is the hero; humidity and CO₂ (with its arc meter —
-            band position reads faster than the bare number) share the row
-            below; the trend rides the right side of the card. */}
-        <div className="mt-4 flex flex-wrap items-end justify-between gap-x-5 gap-y-3">
-          <div className="shrink-0">
-            <div className="text-[40px] font-semibold leading-none tracking-tight text-ink">
-              <NumberTicker value={temp?.value ?? null} digits={1} />
-              <span className="ml-0.5 text-lg font-medium text-muted">°F</span>
+        {/* Comfort first: temperature leads, humidity rides beside it. */}
+        <div className="mt-4 flex items-end justify-between gap-3">
+          <div className="flex items-end gap-5">
+            <div>
+              <div className="text-[40px] font-semibold leading-none tracking-tight text-ink">
+                <NumberTicker value={temp?.value ?? null} digits={1} />
+                <span className="ml-0.5 text-lg font-medium text-muted">°F</span>
+              </div>
+              <MetricCaption status={statusFor(config, "temperature", temp?.value ?? null)}>
+                Temperature
+              </MetricCaption>
             </div>
-            <MetricCaption status={statusFor(config, "temperature", temp?.value ?? null)}>
-              Temperature
-            </MetricCaption>
-            <div className="mt-3 flex items-center gap-4">
-              <div>
-                <div className="text-[26px] font-semibold leading-none tracking-tight text-ink-2">
-                  <NumberTicker value={rh?.value ?? null} digits={0} />
-                  <span className="ml-0.5 text-sm font-medium text-muted">%</span>
-                </div>
-                <MetricCaption status={statusFor(config, "humidity", rh?.value ?? null)}>
-                  Humidity
-                </MetricCaption>
+            <div>
+              <div className="text-[26px] font-semibold leading-none tracking-tight text-ink-2">
+                <NumberTicker value={rh?.value ?? null} digits={0} />
+                <span className="ml-0.5 text-sm font-medium text-muted">%</span>
               </div>
-              {/* Dial first, label to its right; the row reads as one line. */}
-              <div className="flex items-center gap-2">
-                {/* The 240° arc leaves the bottom of its square box empty, so
-                    a 64px gauge draws a ~48px glyph — the humidity block's
-                    height. Trim the box's dead space so alignment tracks the
-                    visible arc, not the square. */}
-                <div className="-mt-px -mb-[15px]">
-                  <Gauge
-                    value={co2?.value ?? null}
-                    bounds={config.thresholds.co2.bounds ?? []}
-                    size={64}
-                    status={co2Status}
-                  >
-                    <span className="text-[13px] font-semibold leading-none text-ink">
-                      <NumberTicker value={co2?.value ?? null} />
-                    </span>
-                    <span className="mt-0.5 text-[8px] font-medium text-muted">ppm</span>
-                  </Gauge>
-                </div>
-                <div className="text-xs leading-tight text-muted">
-                  <div className="flex items-center gap-1.5">
-                    {co2Status && (
-                      <span
-                        aria-hidden
-                        className="h-1.5 w-1.5 rounded-full"
-                        style={{ background: STATUS_COLOR[co2Status] }}
-                      />
-                    )}
-                    CO₂
-                  </div>
-                  {co2Status && co2Status !== "good" && <div className="mt-0.5">ventilate</div>}
-                </div>
-              </div>
+              <MetricCaption status={statusFor(config, "humidity", rh?.value ?? null)}>
+                Humidity
+              </MetricCaption>
             </div>
           </div>
-          <div className="min-w-[120px] flex-1">
-            <RotatingSparkline slots={slots} height={size === "wide" ? 48 : 40} stretch />
+          {/* Capped at the design width but allowed to shrink: a wide card on
+              a phone is still one column, where a fixed 420 svg overflows. */}
+          <div className="min-w-0 flex-1" style={{ maxWidth: size === "wide" ? 420 : 120 }}>
+            <RotatingSparkline
+              slots={slots}
+              width={size === "wide" ? 420 : 120}
+              height={size === "wide" ? 40 : 28}
+              stretch
+            />
           </div>
         </div>
 
-        <AirChips room={room} config={config} />
+        {/* No status dot for CO₂: the dial's fill already carries the color. */}
+        <footer className="mt-4 flex items-center gap-3 border-t border-hairline pt-3">
+          <Gauge
+            value={co2?.value ?? null}
+            bounds={config.thresholds.co2.bounds ?? []}
+            size={56}
+            status={co2Status}
+          >
+            <span className="text-[13px] font-semibold leading-none text-ink">
+              <NumberTicker value={co2?.value ?? null} />
+            </span>
+          </Gauge>
+          <div className="text-xs leading-tight">
+            <div className="font-medium text-ink-2">CO₂</div>
+            <div className="text-muted">
+              ppm
+              {co2 && co2Status !== "good" && co2.value !== null && (
+                <span className="text-ink-2"> · ventilate</span>
+              )}
+            </div>
+          </div>
+          <AirChips room={room} config={config} />
+        </footer>
       </motion.article>
     </div>
   );
 }
 
 /** PM2.5/VOC status chips for sensor-rich rooms; rooms without the sensors
- * render nothing — not even the footer hairline. */
+ * render nothing (the footer stays a clean gauge-only row, not a gap). */
 function AirChips({ room, config }: { room: RoomSnapshot; config: AppConfig }) {
   const chips = (
     [
@@ -205,7 +199,7 @@ function AirChips({ room, config }: { room: RoomSnapshot; config: AppConfig }) {
   if (!chips.length) return null;
 
   return (
-    <footer className="mt-4 flex items-center gap-4 border-t border-hairline pt-3 text-xs text-ink-2">
+    <span className="ml-auto flex flex-col items-end gap-1.5 text-xs text-ink-2 sm:flex-row sm:items-center sm:gap-4">
       {chips.map(([metric, label, mv, digits]) => {
         const s: Status = statusFor(config, metric, mv!.value) ?? "good";
         return (
@@ -215,6 +209,6 @@ function AirChips({ room, config }: { room: RoomSnapshot; config: AppConfig }) {
           </span>
         );
       })}
-    </footer>
+    </span>
   );
 }
