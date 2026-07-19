@@ -56,3 +56,9 @@ class CardLayout(BaseModel):
 
 class Layout(BaseModel):
     cards: list[CardLayout]
+
+
+class ThresholdsUpdate(BaseModel):
+    # metric -> {ranges: {...}} or {bounds: [...]} — numeric shape only; units
+    # are config-owned. Validated/merged by config.build_effective_thresholds.
+    thresholds: dict[str, dict]

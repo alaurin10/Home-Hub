@@ -7,6 +7,7 @@ import type {
   Layout,
   RoomsResponse,
   StateEvent,
+  Threshold,
 } from "./api/types";
 
 interface Store {
@@ -20,6 +21,7 @@ interface Store {
 
   init: () => Promise<void>;
   setEditMode: (on: boolean) => void;
+  setThresholds: (thresholds: Record<string, Threshold>) => void;
   applyEvent: (ev: StateEvent) => void;
   moveCard: (from: number, to: number) => void;
   toggleSize: (id: string) => void;
@@ -90,6 +92,13 @@ export const useStore = create<Store>((set, get) => ({
   },
 
   setEditMode: (on) => set({ editMode: on }),
+
+  // Swap in freshly saved comfort bands so every status color recomputes
+  // immediately — no reload, no refetch of /api/config.
+  setThresholds: (thresholds) => {
+    const config = get().config;
+    if (config) set({ config: { ...config, thresholds } });
+  },
 
   applyEvent: (ev) => {
     const rooms = get().rooms;

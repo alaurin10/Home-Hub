@@ -150,8 +150,17 @@ export function RoomCard({
           </div>
         </div>
 
-        {/* No status dot for CO₂: the dial's fill already carries the color. */}
-        <footer className="mt-4 flex items-center gap-3 border-t border-hairline pt-3">
+        {/* Humidity sits left of CO₂ as a plain reading (no status dot — it's
+            context, and the room status already speaks for extremes). CO₂ keeps
+            no dot either: the dial's fill carries its color. */}
+        <footer className="mt-4 flex items-center gap-4 border-t border-hairline pt-3">
+          <div className="leading-tight">
+            <div className="text-[30px] font-semibold leading-none tracking-tight text-ink">
+              <NumberTicker value={rh?.value ?? null} digits={0} />
+              <span className="ml-0.5 text-base font-medium text-muted">%</span>
+            </div>
+            <div className="mt-1.5 text-xs text-muted">Humidity</div>
+          </div>
           <Gauge
             value={co2?.value ?? null}
             bounds={config.thresholds.co2.bounds ?? []}
@@ -170,16 +179,6 @@ export function RoomCard({
                 <span className="text-ink-2"> · ventilate</span>
               )}
             </div>
-          </div>
-          {/* Humidity rides beside CO₂ now — a supporting reading, not a headline. */}
-          <div className="text-xs leading-tight">
-            <div className="text-[17px] font-semibold leading-none tracking-tight text-ink-2">
-              <NumberTicker value={rh?.value ?? null} digits={0} />
-              <span className="ml-0.5 text-xs font-medium text-muted">%</span>
-            </div>
-            <MetricCaption status={statusFor(config, "humidity", rh?.value ?? null)}>
-              Humidity
-            </MetricCaption>
           </div>
           <AirChips room={room} config={config} />
         </footer>

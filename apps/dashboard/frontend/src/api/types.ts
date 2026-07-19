@@ -54,6 +54,17 @@ export interface AppConfig {
   mode: "demo" | "ha";
 }
 
+// Numeric shape of one metric's bands, unit-less — the editable part of a
+// threshold (units are config-owned and never sent back).
+export type ThresholdShape =
+  | { ranges: Record<"good" | "fair" | "poor", [number, number]> }
+  | { bounds: number[] };
+
+export interface ThresholdsResponse {
+  thresholds: Record<string, Threshold>; // effective (defaults + overrides)
+  defaults: Record<string, Threshold>;   // pristine config.yaml, for reset
+}
+
 export interface HistoryPoint {
   t: number;
   v?: number | null;

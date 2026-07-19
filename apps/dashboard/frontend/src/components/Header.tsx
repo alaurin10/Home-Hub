@@ -1,8 +1,24 @@
 import { motion } from "framer-motion";
+import { useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 
 import { useStore } from "../store";
+import { ComfortSettings } from "./ComfortSettings";
 import { LiveDot } from "./LiveDot";
+
+function GearIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="2" />
+      <path
+        d="M12 2.5v2.2M12 19.3v2.2M21.5 12h-2.2M4.7 12H2.5M18.7 5.3l-1.6 1.6M6.9 17.1l-1.6 1.6M18.7 18.7l-1.6-1.6M6.9 6.9L5.3 5.3"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
 
 const TABS = [
   { to: "/", label: "Home" },
@@ -15,6 +31,7 @@ export function Header() {
   const { config, connected, editMode, setEditMode } = useStore();
   const location = useLocation();
   const onHome = location.pathname === "/";
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   return (
     <header className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-5 pb-2 pt-5">
@@ -55,6 +72,13 @@ export function Header() {
             </NavLink>
           ))}
         </nav>
+        <button
+          onClick={() => setSettingsOpen(true)}
+          aria-label="Comfort settings"
+          className="glass-chrome rounded-full p-2 text-ink-2 transition-colors hover:text-ink"
+        >
+          <GearIcon />
+        </button>
         {onHome && (
           <button
             onClick={() => setEditMode(!editMode)}
@@ -66,6 +90,7 @@ export function Header() {
           </button>
         )}
       </div>
+      <ComfortSettings open={settingsOpen} onClose={() => setSettingsOpen(false)} />
     </header>
   );
 }
