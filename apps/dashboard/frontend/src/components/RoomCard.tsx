@@ -152,21 +152,8 @@ export function RoomCard({
                   Humidity
                 </MetricCaption>
               </div>
-              {/* Label to the left of the arc; the row reads as one line. */}
+              {/* Dial first, label to its right; the row reads as one line. */}
               <div className="flex items-center gap-2">
-                <div className="text-xs leading-tight text-muted">
-                  <div className="flex items-center gap-1.5">
-                    {co2Status && (
-                      <span
-                        aria-hidden
-                        className="h-1.5 w-1.5 rounded-full"
-                        style={{ background: STATUS_COLOR[co2Status] }}
-                      />
-                    )}
-                    CO₂
-                  </div>
-                  {co2Status && co2Status !== "good" && <div className="mt-0.5">ventilate</div>}
-                </div>
                 {/* The 240° arc leaves the bottom of its square box empty, so
                     a 64px gauge draws a ~48px glyph — the humidity block's
                     height. Trim the box's dead space so alignment tracks the
@@ -183,6 +170,19 @@ export function RoomCard({
                     </span>
                     <span className="mt-0.5 text-[8px] font-medium text-muted">ppm</span>
                   </Gauge>
+                </div>
+                <div className="text-xs leading-tight text-muted">
+                  <div className="flex items-center gap-1.5">
+                    {co2Status && (
+                      <span
+                        aria-hidden
+                        className="h-1.5 w-1.5 rounded-full"
+                        style={{ background: STATUS_COLOR[co2Status] }}
+                      />
+                    )}
+                    CO₂
+                  </div>
+                  {co2Status && co2Status !== "good" && <div className="mt-0.5">ventilate</div>}
                 </div>
               </div>
             </div>
