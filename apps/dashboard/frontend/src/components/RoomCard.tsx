@@ -6,6 +6,7 @@ import { useNavigate } from "react-router-dom";
 
 import type { AppConfig, HistoryPoint, RoomSnapshot } from "../api/types";
 import { statusFor, roomStatus, STATUS_COLOR, type Status } from "../lib/thresholds";
+import { Gauge } from "./Gauge";
 import { NumberTicker } from "./NumberTicker";
 import { RotatingSparkline } from "./charts/RotatingSparkline";
 import { StatusChip } from "./StatusChip";
@@ -144,11 +145,20 @@ export function RoomCard({
               Humidity
             </MetricCaption>
           </div>
+          {/* CO₂ keeps its arc meter: where the value sits between the bands
+              reads faster than the bare number. */}
           <div>
-            <div className="text-[26px] font-semibold leading-none tracking-tight text-ink-2">
-              <NumberTicker value={co2?.value ?? null} />
-              <span className="ml-0.5 text-sm font-medium text-muted">ppm</span>
-            </div>
+            <Gauge
+              value={co2?.value ?? null}
+              bounds={config.thresholds.co2.bounds ?? []}
+              size={56}
+              status={co2Status}
+            >
+              <span className="text-[13px] font-semibold leading-none text-ink">
+                <NumberTicker value={co2?.value ?? null} />
+              </span>
+              <span className="mt-0.5 text-[8px] font-medium text-muted">ppm</span>
+            </Gauge>
             <MetricCaption status={co2Status}>
               CO₂
               {co2Status && co2Status !== "good" && <span className="text-ink-2"> · ventilate</span>}
