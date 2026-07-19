@@ -47,10 +47,21 @@ export function worst(statuses: (Status | null)[]): Status | null {
   return result;
 }
 
-/** Overall air status of a room = worst of its thresholded metrics. */
+// Temperature and humidity are comfort metrics: a slightly-off reading is
+// normal and shouldn't tint the whole room. They only escalate the overall
+// status once they're extreme (poor/bad); a merely "fair" humidity is ignored.
+const COMFORT_METRICS = new Set(["temperature", "humidity"]);
+
+/** Overall air status of a room. CO₂ and the particulate/VOC signals drive it
+ * at full strength; temperature and humidity contribute only when extreme, so
+ * high-but-tolerable humidity no longer flips a clean-air room to yellow. */
 export function roomStatus(config: AppConfig, room: RoomSnapshot): Status | null {
   return worst(
-    Object.entries(room.metrics).map(([metric, mv]) => statusFor(config, metric, mv.value)),
+    Object.entries(room.metrics).map(([metric, mv]) => {
+      const status = statusFor(config, metric, mv.value);
+      if (COMFORT_METRICS.has(metric) && status !== "poor" && status !== "bad") return null;
+      return status;
+    }),
   );
 }
 

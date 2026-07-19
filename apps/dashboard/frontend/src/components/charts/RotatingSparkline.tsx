@@ -11,7 +11,7 @@ export interface SparklineSlot {
   minSpan: number;
 }
 
-const ROTATE_MS = 4000;
+const ROTATE_MS = 8000;
 const LABEL_H = 12; // reserved under the curve so the metric label never clips
 
 /** Sparkline that cycles through metrics with a crossfade. The index derives
