@@ -164,10 +164,10 @@ export function RoomCard({
           <Gauge
             value={co2?.value ?? null}
             bounds={config.thresholds.co2.bounds ?? []}
-            size={56}
+            size={72}
             status={co2Status}
           >
-            <span className="text-[13px] font-semibold leading-none text-ink">
+            <span className="text-base font-semibold leading-none text-ink">
               <NumberTicker value={co2?.value ?? null} />
             </span>
           </Gauge>
