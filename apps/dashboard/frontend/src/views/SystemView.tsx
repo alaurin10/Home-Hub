@@ -1,10 +1,20 @@
 import { NodeCard } from "../components/NodeCard";
 import { PageTransition } from "../components/PageTransition";
+import { Skeleton } from "../components/Skeleton";
 import { useStore } from "../store";
 
 export function SystemView() {
   const rooms = useStore((s) => s.rooms);
-  if (!rooms) return null;
+  if (!rooms)
+    return (
+      <main className="mx-auto max-w-5xl px-5 pb-24 pt-4 md:pb-10">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <Skeleton className="h-32" />
+          <Skeleton className="h-32" />
+          <Skeleton className="h-32" />
+        </div>
+      </main>
+    );
 
   const healthy = !rooms.fleet.problem;
 

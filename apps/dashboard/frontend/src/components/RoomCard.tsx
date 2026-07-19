@@ -1,13 +1,13 @@
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { motion } from "framer-motion";
+import type { ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 
-import type { AppConfig, RoomSnapshot } from "../api/types";
+import type { AppConfig, HistoryPoint, RoomSnapshot } from "../api/types";
 import { statusFor, roomStatus, STATUS_COLOR, type Status } from "../lib/thresholds";
-import { Gauge } from "./Gauge";
 import { NumberTicker } from "./NumberTicker";
-import { Sparkline } from "./charts/Sparkline";
+import { RotatingSparkline } from "./charts/RotatingSparkline";
 import { StatusChip } from "./StatusChip";
 
 // Warm the lazy RoomView chunk on first hover/focus so the route switch
@@ -19,17 +19,38 @@ function preloadRoomView() {
   void import("../views/RoomView");
 }
 
+// minSpan per metric keeps a flat night from rendering as noise (see Sparkline).
+const SPARK_SLOTS: { metric: string; label: string; minSpan: number }[] = [
+  { metric: "temperature", label: "Temperature", minSpan: 2 },
+  { metric: "humidity", label: "Humidity", minSpan: 4 },
+  { metric: "co2", label: "CO₂", minSpan: 80 },
+];
+
+/** Caption under a reading: status dot + label (never color alone). */
+function MetricCaption({ status, children }: { status: Status | null; children: ReactNode }) {
+  return (
+    <div className="mt-1.5 flex items-center gap-1.5 text-xs text-muted">
+      {status && (
+        <span aria-hidden className="h-1.5 w-1.5 rounded-full" style={{ background: STATUS_COLOR[status] }} />
+      )}
+      {children}
+    </div>
+  );
+}
+
 export function RoomCard({
   room,
   config,
   size,
   editMode,
+  history,
   onToggleSize,
 }: {
   room: RoomSnapshot;
   config: AppConfig;
   size: "regular" | "wide";
   editMode: boolean;
+  history: Record<string, HistoryPoint[]> | null;
   onToggleSize: () => void;
 }) {
   const navigate = useNavigate();
@@ -45,6 +66,12 @@ export function RoomCard({
   const rh = room.metrics.humidity;
   const co2Status = statusFor(config, "co2", co2?.value ?? null);
 
+  const open = () => !editMode && navigate(`/room/${room.id}`);
+  const slots = SPARK_SLOTS.map((s) => ({
+    ...s,
+    points: history?.[roomCfg.entities[s.metric]] ?? null,
+  }));
+
   return (
     <div
       ref={setNodeRef}
@@ -55,13 +82,19 @@ export function RoomCard({
       {...(editMode ? attributes : {})}
     >
       <motion.article
-        onClick={() => !editMode && navigate(`/room/${room.id}`)}
+        onClick={open}
+        onKeyDown={(e) => {
+          if (editMode || (e.key !== "Enter" && e.key !== " ")) return;
+          e.preventDefault(); // Space must not scroll the page
+          open();
+        }}
+        {...(editMode ? {} : { role: "button", tabIndex: 0, "aria-label": `${room.name} details` })}
         onPointerEnter={preloadRoomView}
         onFocus={preloadRoomView}
         whileHover={editMode ? undefined : { y: -3, scale: 1.005 }}
         whileTap={editMode ? undefined : { scale: 0.985 }}
         transition={{ type: "spring", stiffness: 320, damping: 24 }}
-        className={`glass relative h-full cursor-pointer rounded-3xl p-5 ${
+        className={`glass relative h-full cursor-pointer rounded-3xl p-5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink-2)] ${
           editMode ? "cursor-grab active:cursor-grabbing" : ""
         }`}
         {...(editMode ? listeners : {})}
@@ -71,7 +104,7 @@ export function RoomCard({
             <h2 className="text-sm font-semibold text-ink">{room.name}</h2>
             {!room.node.online && (
               <span className="text-xs font-medium" style={{ color: "var(--status-bad)" }}>
-                ⚠ offline
+                <span aria-hidden>⚠ </span>offline
               </span>
             )}
           </div>
@@ -91,61 +124,52 @@ export function RoomCard({
           )}
         </header>
 
-        {/* Comfort first: temperature leads, humidity rides beside it. */}
-        <div className="mt-4 flex items-end justify-between gap-3">
-          <div className="flex items-end gap-5">
-            <div>
-              <div className="text-[40px] font-semibold leading-none tracking-tight text-ink">
-                <NumberTicker value={temp?.value ?? null} digits={1} />
-                <span className="ml-0.5 text-lg font-medium text-muted">°F</span>
-              </div>
-              <div className="mt-1.5 text-xs text-muted">Temperature</div>
+        {/* Comfort first: temperature leads; humidity and CO₂ ride beside it. */}
+        <div className="mt-4 flex flex-wrap items-end gap-x-5 gap-y-3">
+          <div>
+            <div className="text-[40px] font-semibold leading-none tracking-tight text-ink">
+              <NumberTicker value={temp?.value ?? null} digits={1} />
+              <span className="ml-0.5 text-lg font-medium text-muted">°F</span>
             </div>
-            <div>
-              <div className="text-[26px] font-semibold leading-none tracking-tight text-ink-2">
-                <NumberTicker value={rh?.value ?? null} digits={0} />
-                <span className="ml-0.5 text-sm font-medium text-muted">%</span>
-              </div>
-              <div className="mt-1.5 text-xs text-muted">Humidity</div>
-            </div>
+            <MetricCaption status={statusFor(config, "temperature", temp?.value ?? null)}>
+              Temperature
+            </MetricCaption>
           </div>
-          <Sparkline
-            entity={roomCfg.entities.temperature}
-            minSpan={2}
-            width={size === "wide" ? 420 : 120}
-            height={size === "wide" ? 40 : 28}
-          />
+          <div>
+            <div className="text-[26px] font-semibold leading-none tracking-tight text-ink-2">
+              <NumberTicker value={rh?.value ?? null} digits={0} />
+              <span className="ml-0.5 text-sm font-medium text-muted">%</span>
+            </div>
+            <MetricCaption status={statusFor(config, "humidity", rh?.value ?? null)}>
+              Humidity
+            </MetricCaption>
+          </div>
+          <div>
+            <div className="text-[26px] font-semibold leading-none tracking-tight text-ink-2">
+              <NumberTicker value={co2?.value ?? null} />
+              <span className="ml-0.5 text-sm font-medium text-muted">ppm</span>
+            </div>
+            <MetricCaption status={co2Status}>
+              CO₂
+              {co2Status && co2Status !== "good" && <span className="text-ink-2"> · ventilate</span>}
+            </MetricCaption>
+          </div>
         </div>
 
-        <footer className="mt-4 flex items-center gap-3 border-t border-hairline pt-3">
-          <Gauge
-            value={co2?.value ?? null}
-            bounds={config.thresholds.co2.bounds}
-            size={56}
-            status={co2Status}
-          >
-            <span className="text-[13px] font-semibold leading-none text-ink">
-              <NumberTicker value={co2?.value ?? null} />
-            </span>
-          </Gauge>
-          <div className="text-xs leading-tight">
-            <div className="font-medium text-ink-2">CO₂</div>
-            <div className="text-muted">
-              ppm
-              {co2 && co2Status !== "good" && co2.value !== null && (
-                <span className="text-ink-2"> · ventilate</span>
-              )}
-            </div>
-          </div>
-          <AirChips room={room} config={config} />
-        </footer>
+        {/* The freed footer space hosts the trend: one sparkline rotating
+            through the metrics above (label crossfades with its curve). */}
+        <div className="mt-4">
+          <RotatingSparkline slots={slots} height={size === "wide" ? 40 : 28} stretch />
+        </div>
+
+        <AirChips room={room} config={config} />
       </motion.article>
     </div>
   );
 }
 
 /** PM2.5/VOC status chips for sensor-rich rooms; rooms without the sensors
- * render nothing (the footer stays a clean gauge-only row, not a gap). */
+ * render nothing — not even the footer hairline. */
 function AirChips({ room, config }: { room: RoomSnapshot; config: AppConfig }) {
   const chips = (
     [
@@ -156,7 +180,7 @@ function AirChips({ room, config }: { room: RoomSnapshot; config: AppConfig }) {
   if (!chips.length) return null;
 
   return (
-    <span className="ml-auto flex flex-col items-end gap-1.5 text-xs text-ink-2 sm:flex-row sm:items-center sm:gap-4">
+    <footer className="mt-4 flex items-center gap-4 border-t border-hairline pt-3 text-xs text-ink-2">
       {chips.map(([metric, label, mv, digits]) => {
         const s: Status = statusFor(config, metric, mv!.value) ?? "good";
         return (
@@ -166,6 +190,6 @@ function AirChips({ room, config }: { room: RoomSnapshot; config: AppConfig }) {
           </span>
         );
       })}
-    </span>
+    </footer>
   );
 }

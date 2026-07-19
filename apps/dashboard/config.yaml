@@ -23,6 +23,8 @@ rooms:
       status: binary_sensor.kitchen_air_status
       wifi_signal: sensor.kitchen_air_wifi_signal
       uptime: sensor.kitchen_air_uptime
+      esphome_version: sensor.kitchen_air_esphome_version
+      ip_address: sensor.kitchen_air_ip_address
 
   - id: bedroom
     name: Bedroom
@@ -36,6 +38,8 @@ rooms:
       status: binary_sensor.bedroom_air_status
       wifi_signal: sensor.bedroom_air_wifi_signal
       uptime: sensor.bedroom_air_uptime
+      esphome_version: sensor.bedroom_air_esphome_version
+      ip_address: sensor.bedroom_air_ip_address
 
   - id: living
     name: Living Room
@@ -49,15 +53,22 @@ rooms:
       status: binary_sensor.living_air_status
       wifi_signal: sensor.living_air_wifi_signal
       uptime: sensor.living_air_uptime
+      esphome_version: sensor.living_air_esphome_version
+      ip_address: sensor.living_air_ip_address
 
 # Fleet-health entities (packages/monitoring.yaml)
 fleet:
   stale_nodes: sensor.stale_air_nodes
   problem: binary_sensor.air_fleet_problem
 
-# Status bands per metric: value < first bound = good, then fair/poor/very_poor.
+# Status bands per metric. Two shapes:
+#   bounds: [a, b, c]  — monotonic: value < a = good, then fair/poor/bad.
+#   ranges: {good/fair/poor: [lo, hi]} — band: too low AND too high are both
+#     bad; windows must nest (good within fair within poor), outside poor = bad.
 # Units are display-only. These drive every signal color in the UI.
 thresholds:
+  temperature: {ranges: {good: [67, 75], fair: [64, 78], poor: [60, 82]}, unit: "°F"}
+  humidity: {ranges: {good: [35, 55], fair: [30, 60], poor: [25, 65]}, unit: "%"}
   co2: {bounds: [800, 1200, 2000], unit: ppm}
   pm2_5: {bounds: [12, 35, 55], unit: "µg/m³"}
   pm1_0: {bounds: [12, 35, 55], unit: "µg/m³"}

@@ -163,7 +163,7 @@ class SimProvider:
             if metric == "nox":
                 return round(max(1.0, 1.0 + voc * 0.05 + abs(_noise(entity_id, t, 1200, 1.5))), 0)
 
-        for room in self.config.rooms:
+        for i, room in enumerate(self.config.rooms):
             if entity_id == room.node.get("status"):
                 return "off" if settings.SIM_FAULT == room.id else "on"
             if entity_id == room.node.get("wifi_signal"):
@@ -174,6 +174,10 @@ class SimProvider:
                 if settings.SIM_FAULT == room.id:
                     return None
                 return round(t - UPTIME_EPOCH, 0)
+            if entity_id == room.node.get("esphome_version"):
+                return None if settings.SIM_FAULT == room.id else "2025.6.3"
+            if entity_id == room.node.get("ip_address"):
+                return None if settings.SIM_FAULT == room.id else f"192.168.1.{40 + i}"
 
         # Fleet entities: same semantics as packages/monitoring.yaml
         if entity_id == self.config.fleet["stale_nodes"]:

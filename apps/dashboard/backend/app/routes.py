@@ -68,6 +68,12 @@ async def get_rooms(request: Request):
             ts=ev.get("ts"),
         )
 
+    def entity_missing(entity_id: str) -> bool:
+        # Absent from the snapshot (entity_id typo / not in HA) or present but
+        # valueless (unavailable/unknown/disabled) — either way, no data.
+        ev = states.get(entity_id)
+        return ev is None or ev.get("value") is None
+
     rooms = []
     stale: list[str] = []
     for room in cfg.rooms:
@@ -75,6 +81,8 @@ async def get_rooms(request: Request):
         status_ev = states.get(room.node["status"]) or {}
         wifi_ev = states.get(room.node["wifi_signal"]) or {}
         uptime_ev = states.get(room.node["uptime"]) or {}
+        version_ev = states.get(room.node.get("esphome_version", "")) or {}
+        ip_ev = states.get(room.node.get("ip_address", "")) or {}
         co2_ts = (metrics.get("co2") or MetricValue(value=None)).ts
         is_stale = co2_ts is None or (now - co2_ts) > STALE_AFTER_S
         online = status_ev.get("value") == "on" and not is_stale
@@ -90,6 +98,13 @@ async def get_rooms(request: Request):
                     wifi_signal=wifi_ev.get("value") if isinstance(wifi_ev.get("value"), (int, float)) else None,
                     uptime=uptime_ev.get("value") if isinstance(uptime_ev.get("value"), (int, float)) else None,
                     last_seen=co2_ts,
+                    esphome_version=version_ev.get("value") if isinstance(version_ev.get("value"), str) else None,
+                    ip_address=ip_ev.get("value") if isinstance(ip_ev.get("value"), str) else None,
+                    missing=sorted(
+                        e
+                        for e in [*room.entities.values(), *room.node.values()]
+                        if entity_missing(e)
+                    ),
                 ),
             )
         )

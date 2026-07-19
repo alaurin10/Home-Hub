@@ -14,7 +14,7 @@ const RoomView = lazy(() => import("./views/RoomView").then((m) => ({ default: m
 const SystemView = lazy(() => import("./views/SystemView").then((m) => ({ default: m.SystemView })));
 
 export default function App() {
-  const { init, ready } = useStore();
+  const { init, ready, initError } = useStore();
   const location = useLocation();
 
   useEffect(() => {
@@ -26,6 +26,22 @@ export default function App() {
   useEffect(() => {
     if (ready) document.documentElement.dataset.loaded = "1";
   }, [ready]);
+
+  if (initError && !ready)
+    return (
+      <div className="flex min-h-screen items-center justify-center px-5">
+        <div role="alert" className="glass max-w-sm rounded-3xl p-8 text-center">
+          <p className="text-sm font-semibold text-ink">Couldn't reach the dashboard server.</p>
+          <p className="mt-2 text-xs text-muted">{initError}</p>
+          <button
+            onClick={() => void init()}
+            className="glass-chrome mt-5 rounded-full px-4 py-1.5 text-sm font-medium text-ink-2"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
 
   return (
     <div className="min-h-screen">

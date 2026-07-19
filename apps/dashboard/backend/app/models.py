@@ -14,6 +14,9 @@ class NodeStatus(BaseModel):
     wifi_signal: float | None = None
     uptime: float | None = None       # seconds
     last_seen: float | None = None    # unix seconds
+    esphome_version: str | None = None
+    ip_address: str | None = None
+    missing: list[str] = []           # configured entity_ids with no data in the snapshot
 
 
 class RoomSnapshot(BaseModel):

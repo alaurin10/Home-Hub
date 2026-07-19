@@ -54,7 +54,29 @@ export function NodeCard({ room }: { room: RoomSnapshot }) {
           <dt className="text-xs text-muted">Last seen</dt>
           <dd className="mt-0.5 text-ink-2">{relativeTime(room.node.last_seen)}</dd>
         </div>
+        <div>
+          <dt className="text-xs text-muted">Version</dt>
+          <dd className="mt-0.5 text-ink-2">{room.node.esphome_version ?? "–"}</dd>
+        </div>
+        <div>
+          <dt className="text-xs text-muted">IP</dt>
+          <dd className="mt-0.5 text-ink-2 tabular-nums">{room.node.ip_address ?? "–"}</dd>
+        </div>
       </dl>
+      {room.node.missing.length > 0 && (
+        <div className="mt-4 border-t border-hairline pt-3">
+          <p className="flex items-center gap-1.5 text-xs font-medium text-ink-2">
+            <span aria-hidden className="h-1.5 w-1.5 rounded-full" style={{ background: "var(--status-fair)" }} />
+            {room.node.missing.length} configured{" "}
+            {room.node.missing.length === 1 ? "entity" : "entities"} not reporting
+          </p>
+          {/* Full entity_ids on purpose: they ARE the diagnosis — compare
+              against HA Developer Tools → States to spot renames/disables. */}
+          <p className="mt-1.5 font-mono text-[11px] leading-relaxed text-muted break-all">
+            {room.node.missing.join(" · ")}
+          </p>
+        </div>
+      )}
     </article>
   );
 }
