@@ -27,11 +27,13 @@ const SPARK_SLOTS: { metric: string; label: string; minSpan: number }[] = [
   { metric: "co2", label: "CO₂", minSpan: 80 },
 ];
 
-/** Caption under a reading: status dot + label (never color alone). */
+/** Caption under a reading: status dot + label (never color alone). A green
+ * reading drops the dot entirely — the plain label reads as "fine", and only
+ * a fair/poor/bad status is worth calling out with a colored dot. */
 function MetricCaption({ status, children }: { status: Status | null; children: ReactNode }) {
   return (
     <div className="mt-1.5 flex items-center gap-1.5 text-xs text-muted">
-      {status && (
+      {status && status !== "good" && (
         <span aria-hidden className="h-1.5 w-1.5 rounded-full" style={{ background: STATUS_COLOR[status] }} />
       )}
       {children}
@@ -125,27 +127,16 @@ export function RoomCard({
           )}
         </header>
 
-        {/* Comfort first: temperature leads, humidity rides beside it. */}
+        {/* Comfort first: temperature leads with the trend beside it. */}
         <div className="mt-4 flex items-end justify-between gap-3">
-          <div className="flex items-end gap-5">
-            <div>
-              <div className="text-[40px] font-semibold leading-none tracking-tight text-ink">
-                <NumberTicker value={temp?.value ?? null} digits={1} />
-                <span className="ml-0.5 text-lg font-medium text-muted">°F</span>
-              </div>
-              <MetricCaption status={statusFor(config, "temperature", temp?.value ?? null)}>
-                Temperature
-              </MetricCaption>
+          <div>
+            <div className="text-[40px] font-semibold leading-none tracking-tight text-ink">
+              <NumberTicker value={temp?.value ?? null} digits={1} />
+              <span className="ml-0.5 text-lg font-medium text-muted">°F</span>
             </div>
-            <div>
-              <div className="text-[26px] font-semibold leading-none tracking-tight text-ink-2">
-                <NumberTicker value={rh?.value ?? null} digits={0} />
-                <span className="ml-0.5 text-sm font-medium text-muted">%</span>
-              </div>
-              <MetricCaption status={statusFor(config, "humidity", rh?.value ?? null)}>
-                Humidity
-              </MetricCaption>
-            </div>
+            <MetricCaption status={statusFor(config, "temperature", temp?.value ?? null)}>
+              Temperature
+            </MetricCaption>
           </div>
           {/* Capped at the design width but allowed to shrink: a wide card on
               a phone is still one column, where a fixed 420 svg overflows. */}
@@ -179,6 +170,16 @@ export function RoomCard({
                 <span className="text-ink-2"> · ventilate</span>
               )}
             </div>
+          </div>
+          {/* Humidity rides beside CO₂ now — a supporting reading, not a headline. */}
+          <div className="text-xs leading-tight">
+            <div className="text-[17px] font-semibold leading-none tracking-tight text-ink-2">
+              <NumberTicker value={rh?.value ?? null} digits={0} />
+              <span className="ml-0.5 text-xs font-medium text-muted">%</span>
+            </div>
+            <MetricCaption status={statusFor(config, "humidity", rh?.value ?? null)}>
+              Humidity
+            </MetricCaption>
           </div>
           <AirChips room={room} config={config} />
         </footer>
