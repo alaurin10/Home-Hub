@@ -1,5 +1,10 @@
 # 10 — Remote access: dashboards in any browser (Cloudflare Tunnel + Access)
 
+> **Status: LIVE (2026-07-22).** Both `https://ha.<domain>` and
+> `https://dash.<domain>` verified reachable on cellular data with WiFi off,
+> behind the Access login. Setup below is kept as the runbook for rebuilds/
+> new hostnames, not a to-do list.
+>
 > Decision (July 2026): browser dashboards are reached via **Cloudflare Tunnel +
 > Access** — open `https://dash.<domain>` / `https://ha.<domain>` on any
 > device, pass the Access login, then the app's own login (HA only — the
@@ -93,9 +98,9 @@ hostname is public — **never** skip this step for a new hostname.
 
 On a phone **on cellular** (WiFi off):
 
-- [ ] `https://dash.<domain>` → Access login → live sensor cards, values
+- [x] `https://dash.<domain>` → Access login → live sensor cards, values
       updating.
-- [ ] `https://ha.<domain>` → Access login → HA login → Lovelace loads;
+- [x] `https://ha.<domain>` → Access login → HA login → Lovelace loads;
       no `400 Bad Request` (if you get one, the `trusted_proxies` subnet is
       wrong — see step 2).
 - [ ] Router: **zero** port-forward rules exist.

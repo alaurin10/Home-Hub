@@ -9,11 +9,12 @@ homeassistant:
   packages: !include_dir_named packages
 
 # Reverse proxy for remote dashboards (Cloudflare Tunnel / cloudflared add-on).
-# Set trusted_proxies to the cloudflared add-on's docker subnet in Phase 7.
+# Phase 7 is live: ha.<domain> and dash.<domain> verified reachable off-WiFi
+# through Cloudflare Tunnel + Access. See docs/10-remote-access.md.
 http:
   use_x_forwarded_for: true
   trusted_proxies:
-    - 172.30.33.0/24      # Supervisor add-on network (adjust in Phase 7)
+    - 172.30.33.0/24      # Supervisor add-on network
 
 # UI-managed but git-tracked (edit in the UI; they serialize to these files):
 automation: !include automations.yaml

@@ -48,8 +48,9 @@ see its own test suite + `apps/dashboard/README.md` instead of a phase checklist
 - [ ] Unplug a node → stale alert fires.
 - [ ] Backup exists locally **and** off-site; **restore drill** passes.
 - [ ] UPS → "on battery" → graceful shutdown.
-- [ ] On cellular: **the dashboard app opens via the Cloudflare URL (Access
-      login)** and the **HA Companion app works via Tailscale**.
+- [x] On cellular: **the dashboard app opens via the Cloudflare URL (Access
+      login)** — verified 2026-07-22, `ha.<domain>` and `dash.<domain>` both
+      reachable off-WiFi. HA Companion app / Tailscale leg still to confirm.
 
 ## Phase 8 — auto-deploy
 - [ ] One-line edit pushed to `main` (e.g., from GitHub mobile) validates in cloud,
