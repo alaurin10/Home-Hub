@@ -574,7 +574,8 @@ changes"; **back up (and snapshot) before any update.**
   high-CO2→notify); `dashboards/overview.yaml`; expand ESP nodes via shared
   base. **DoD:** ≥2 automations fire on real triggers; overview shows all
   rooms; CI green.
-- **Phase 7 — Backups + monitoring + secure remote access + hardening:** Supervisor
+- **Phase 7 — Backups + monitoring + secure remote access + hardening — remote
+  access LIVE (2026-07-22):** Supervisor
   auto-backups + off-site + Proxmox snapshot policy; finalize `monitoring.yaml`;
   NUT/UPS graceful shutdown; **`cloudflared` add-on → Cloudflare Tunnel + Access**
   for browser dashboards (set HA `trusted_proxies`; Access policy = your identity);
@@ -650,9 +651,9 @@ changes"; **back up (and snapshot) before any update.**
   push-to-deploy.
 - **OTA rollout shape:** canary + batch size (default: 1 canary, then small batches)
   and the per-device health-check timeout.
-- **Dashboard domain** — **DECIDED (July 2026):** subdomains of the existing
-  Cloudflare-managed domain (`grafana.<domain>`, `ha.<domain>`; `dash.<domain>`
-  later). Runbook: `docs/10-remote-access.md`.
+- **Dashboard domain** — **LIVE (2026-07-22):** subdomains of the existing
+  Cloudflare-managed domain — `ha.<domain>` and `dash.<domain>`, both verified
+  reachable off-WiFi behind Access. Runbook: `docs/10-remote-access.md`.
 - **Cloudflare Access identity** — **DECIDED (July 2026):** Google SSO
   (one-time-PIN email as fallback), and **both** layers: Access gate *and*
   each app's own login where one exists (the dashboard app has none by

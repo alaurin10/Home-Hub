@@ -32,8 +32,8 @@ DNS exists.
 
 - Static IP; router DHCP hands out Pi-hole as DNS.
 - **Local DNS records** for every service: `pve.home.arpa`, `ha.home.arpa`,
-  `grafana.home.arpa`, `kuma.home.arpa`, … — this is what makes N2's reverse
-  proxy usable without memorizing ports.
+  `kuma.home.arpa`, … — this is what makes N2's reverse proxy usable without
+  memorizing ports.
 - **Sole-DNS risk** (already flagged in `proxmox/README.md`): Pi-hole down =
   internet "down" for the household. Mitigations, pick one: (a) accept it —
   it's an LXC on a UPS-backed host, restart is one command; (b) router hands
@@ -53,11 +53,11 @@ Today every service is `ip:port` over plain HTTP. One small LXC running
   everything else. Caddy's `internal` TLS issuer gives padlocked HTTPS on the
   LAN with one line; install its root CA on your devices once (or, if you own
   a real domain, use DNS-01 for a wildcard cert and skip the CA install).
-- Routes: `ha.` → HA VM :8123, `grafana.` → :3000, `influx.` → :8086,
-  `kuma.` → the N3 LXC, `pve.` → :8006, `pihole.` → Pi-hole admin.
+- Routes: `ha.` → HA VM :8123, `kuma.` → the N3 LXC, `pve.` → :8006,
+  `pihole.` → Pi-hole admin.
 - HA needs `use_x_forwarded_for` + the proxy's IP in `trusted_proxies`
-  (`configuration.yaml` — currently holds the cloudflared subnet placeholder;
-  Phase 7 sets both).
+  (`configuration.yaml` already holds the cloudflared subnet from Phase 7;
+  N2 adds this proxy's IP alongside it).
 - **DoD:** every service reachable at `https://<name>.home.arpa` with no
   browser warning; committed Caddyfile is the only route config.
 
@@ -75,7 +75,7 @@ no-inbound-ports rule.
   `*.home.arpa` names work remotely too.
 - Keep the HA add-on as a fallback path (two doors, one vendor) or drop it
   once the subnet router is proven — decide during Phase 7.
-- **DoD:** on cellular, `https://grafana.home.arpa` loads and `ssh pve` works;
+- **DoD:** on cellular, `https://pve.home.arpa` loads and `ssh pve` works;
   no port-forwards exist on the router.
 
 ### N4 — Segmentation, apartment-scaled (honesty item)
