@@ -37,6 +37,13 @@ COOKING_EVENTS = [(8.0, 45.0, 220.0), (12.5, 65.0, 260.0), (19.0, 140.0, 340.0)]
 COOKING_TAU_H = 25.0 / 60.0  # PM decay time constant ≈ 25 min
 
 TEMP_SETPOINTS = {"bedroom": 19.5, "living": 21.5, "kitchen": 21.0}
+# Afternoon solar gain, °C at the peak, per room. A west-facing living room runs
+# warmer than its own daily mean while the sun is on it and falls back after
+# sunset — which is exactly what the "solar gain" insight looks for, and what a
+# room that merely runs warm does not do.
+SOLAR_GAIN_C = {"living": 1.1}
+SOLAR_PEAK_H = 14.5   # mid-afternoon
+SOLAR_WIDTH_H = 1.6
 UPTIME_EPOCH = time.time() - 6 * 86400  # nodes "booted" 6 days ago
 
 
@@ -94,11 +101,24 @@ def _cooking_intensity(hod: float) -> tuple[float, float]:
     return pm, voc
 
 
+def _solar_gain(room: str, hod: float) -> float:
+    peak = SOLAR_GAIN_C.get(room)
+    if not peak:
+        return 0.0
+    return peak * math.exp(-0.5 * ((hod - SOLAR_PEAK_H) / SOLAR_WIDTH_H) ** 2)
+
+
 def _temperature(room: str, entity_id: str, t: float) -> float:
     hod = _hour_of_day(t)
     diurnal = 1.2 * math.sin(2 * math.pi * (hod - 9) / 24.0)
     cooking = 2.0 * (_cooking_intensity(hod)[0] / 140.0) if room == "kitchen" else 0.0
-    return TEMP_SETPOINTS[room] + diurnal + cooking + _noise(entity_id, t, 5400, 0.3)
+    return (
+        TEMP_SETPOINTS[room]
+        + diurnal
+        + cooking
+        + _solar_gain(room, hod)
+        + _noise(entity_id, t, 5400, 0.3)
+    )
 
 
 def _humidity(room: str, entity_id: str, t: float) -> float:

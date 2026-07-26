@@ -6,6 +6,8 @@ from pathlib import Path
 
 import yaml
 
+from .score import ScoreConfig
+
 
 @dataclass
 class Room:
@@ -21,6 +23,7 @@ class AppConfig:
     rooms: list[Room]
     fleet: dict[str, str]             # stale_nodes/problem -> entity_id
     thresholds: dict[str, dict]       # metric -> {bounds: [...], unit: str}
+    score: ScoreConfig = field(default_factory=ScoreConfig)
     _by_entity: dict[str, tuple[str, str]] = field(default_factory=dict)
 
     @property
@@ -96,6 +99,7 @@ def load_config(path: Path) -> AppConfig:
         rooms=rooms,
         fleet=dict(raw["fleet"]),
         thresholds=thresholds,
+        score=ScoreConfig(raw.get("score")),
     )
     for room in rooms:
         for metric, entity_id in room.entities.items():

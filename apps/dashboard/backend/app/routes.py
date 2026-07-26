@@ -4,7 +4,7 @@ plus live data — rooms and thresholds are config, not code."""
 import json
 import time
 
-from fastapi import APIRouter, HTTPException, Query, Request, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, HTTPException, Query, Request, Response, WebSocket, WebSocketDisconnect
 
 from . import settings
 from .config import build_effective_thresholds
@@ -12,13 +12,22 @@ from .models import (
     CardLayout,
     FleetStatus,
     HistoryResponse,
+    HouseSummary,
+    Insight,
     Layout,
     MetricValue,
     NodeStatus,
+    Outdoor,
+    OutdoorDelta,
+    RoomScore,
     RoomsResponse,
     RoomSnapshot,
+    ScorePartModel,
+    Settings,
     ThresholdsUpdate,
 )
+from .providers.weather import Place, geocode, ventilation_advice
+from .score import band_for, house_summary, score_room
 from .stream import hub
 
 router = APIRouter(prefix="/api")
@@ -46,10 +55,12 @@ async def get_config(request: Request):
     }
 
 
-@router.get("/rooms", response_model=RoomsResponse)
-async def get_rooms(request: Request):
-    cfg = request.app.state.config
-    states = await request.app.state.provider.snapshot()
+async def build_rooms(app) -> RoomsResponse:
+    """The one place a room snapshot is assembled — /api/rooms, /api/outdoor and
+    the insight task all read this so they can never disagree about what the
+    house currently reads."""
+    cfg = app.state.config
+    states = await app.state.provider.snapshot()
     now = time.time()
 
     def metric_value(entity_id: str, metric: str) -> MetricValue:
@@ -78,6 +89,7 @@ async def get_rooms(request: Request):
 
     rooms = []
     stale: list[str] = []
+    scored: list[tuple[str, int, list]] = []
     for room in cfg.rooms:
         metrics = {m: metric_value(e, m) for m, e in room.entities.items()}
         status_ev = states.get(room.node["status"]) or {}
@@ -90,11 +102,30 @@ async def get_rooms(request: Request):
         online = status_ev.get("value") == "on" and not is_stale
         if not online:
             stale.append(room.id)
+        # An offline node keeps score=None: its last-known readings are stale by
+        # definition, and a stale 100 is worse than no number at all.
+        result = score_room({m: mv.value for m, mv in metrics.items()}, cfg.thresholds, cfg.score)
+        if online and result is not None:
+            value, parts = result
+            scored.append((room.name, value, parts))
+            score = RoomScore(
+                value=value,
+                band=band_for(value, cfg.score),
+                parts=[
+                    ScorePartModel(
+                        metric=p.metric, label=p.label, detail=p.detail, penalty=round(p.penalty, 1)
+                    )
+                    for p in parts
+                ],
+            )
+        else:
+            score = None
         rooms.append(
             RoomSnapshot(
                 id=room.id,
                 name=room.name,
                 metrics=metrics,
+                score=score,
                 node=NodeStatus(
                     online=online,
                     wifi_signal=wifi_ev.get("value") if isinstance(wifi_ev.get("value"), (int, float)) else None,
@@ -110,7 +141,16 @@ async def get_rooms(request: Request):
                 ),
             )
         )
-    return RoomsResponse(rooms=rooms, fleet=FleetStatus(stale_nodes=stale, problem=bool(stale)))
+    return RoomsResponse(
+        rooms=rooms,
+        fleet=FleetStatus(stale_nodes=stale, problem=bool(stale)),
+        house=HouseSummary(**house_summary(scored, cfg.thresholds, cfg.score)),
+    )
+
+
+@router.get("/rooms", response_model=RoomsResponse)
+async def get_rooms(request: Request):
+    return await build_rooms(request.app)
 
 
 @router.get("/history", response_model=HistoryResponse)
@@ -204,6 +244,144 @@ async def put_thresholds(request: Request, update: ThresholdsUpdate):
     (settings.DATA_DIR / THRESHOLDS_FILE).write_text(json.dumps(sanitized), encoding="utf-8")
     request.app.state.config.thresholds = effective
     return {"thresholds": effective, "defaults": defaults}
+
+
+SETTINGS_FILE = "settings.json"
+
+
+def load_settings() -> Settings:
+    """Household preferences, or the blank default. Called at startup and by the
+    handlers below. A corrupt file must not break startup — it falls back to
+    defaults and the user re-saves."""
+    path = settings.DATA_DIR / SETTINGS_FILE
+    if path.exists():
+        try:
+            return Settings(**json.loads(path.read_text(encoding="utf-8")))
+        except (ValueError, TypeError):
+            pass
+    return Settings()
+
+
+def _save_settings(value: Settings) -> None:
+    settings.DATA_DIR.mkdir(parents=True, exist_ok=True)
+    (settings.DATA_DIR / SETTINGS_FILE).write_text(value.model_dump_json(), encoding="utf-8")
+
+
+@router.get("/settings", response_model=Settings)
+async def get_settings(request: Request):
+    return request.app.state.settings
+
+
+@router.put("/settings", response_model=Settings)
+async def put_settings(request: Request, update: Settings):
+    if update.scale not in ("F", "C"):
+        raise HTTPException(400, "scale must be 'F' or 'C'")
+    current: Settings = request.app.state.settings
+    saved = Settings(location=update.location.strip(), scale=update.scale)
+    if not saved.location:
+        pass  # cleared: drop the resolved coordinates with it
+    elif saved.location == current.location and current.latitude is not None:
+        # Unchanged location keeps its resolution — no geocode call per save.
+        saved.station, saved.latitude, saved.longitude = (
+            current.station,
+            current.latitude,
+            current.longitude,
+        )
+    else:
+        place = await geocode(saved.location)
+        if place is not None:
+            saved.latitude, saved.longitude = place.latitude, place.longitude
+            saved.station = place.label
+        # A location that resolved to nothing is saved as typed with no
+        # coordinates, so the UI can show "couldn't match that" rather than
+        # silently keeping the old place.
+    request.app.state.settings = saved
+    request.app.state.outdoor_cache.invalidate()
+    _save_settings(saved)
+    return saved
+
+
+def _place_of(current: Settings) -> Place | None:
+    if current.latitude is None or current.longitude is None:
+        return None
+    return Place(
+        latitude=current.latitude,
+        longitude=current.longitude,
+        label=current.station or current.location,
+    )
+
+
+def _fraction(value: float, span: float) -> float:
+    """A signed magnitude as a 0–1 bar fill, so the three delta rows are
+    comparable at a glance without inventing precision."""
+    return max(0.0, min(1.0, abs(value) / span))
+
+
+@router.get("/outdoor", response_model=Outdoor)
+async def get_outdoor(request: Request):
+    place = _place_of(request.app.state.settings)
+    reading = await request.app.state.outdoor_cache.get(place)
+    if reading is None:
+        # No location set, or nothing resolved/reachable. 204 rather than a
+        # fabricated card — the UI prompts for a location instead.
+        return Response(status_code=204)
+
+    snapshot = await build_rooms(request.app)
+    online = [r for r in snapshot.rooms if r.node.online]
+    indoor_temps = [r.metrics["temperature"].value for r in online if r.metrics.get("temperature")]
+    indoor_temps = [t for t in indoor_temps if t is not None]
+    indoor_rh = [r.metrics["humidity"].value for r in online if r.metrics.get("humidity")]
+    indoor_rh = [h for h in indoor_rh if h is not None]
+
+    deltas: list[OutdoorDelta] = []
+    mean_temp = sum(indoor_temps) / len(indoor_temps) if indoor_temps else None
+    if reading.temp is not None and mean_temp is not None:
+        diff = mean_temp - reading.temp
+        deltas.append(
+            OutdoorDelta(
+                label="Indoor vs outdoor temp",
+                text=f"{'+' if diff >= 0 else '−'}{abs(diff):.1f} °F inside",
+                fraction=_fraction(diff, 20.0),
+            )
+        )
+    mean_rh = sum(indoor_rh) / len(indoor_rh) if indoor_rh else None
+    if reading.humidity is not None and mean_rh is not None:
+        diff = mean_rh - reading.humidity
+        deltas.append(
+            OutdoorDelta(
+                label="Indoor vs outdoor RH",
+                text=f"{'+' if diff >= 0 else '−'}{abs(diff):.0f} % inside",
+                fraction=_fraction(diff, 35.0),
+            )
+        )
+    if reading.pm2_5 is not None:
+        deltas.append(
+            OutdoorDelta(
+                label="Nearest monitor PM2.5",
+                text=f"{reading.pm2_5:.1f} µg/m³",
+                fraction=_fraction(reading.pm2_5, 35.0),
+            )
+        )
+
+    return Outdoor(
+        temp=reading.temp,
+        humidity=reading.humidity,
+        aqi=reading.aqi,
+        pm2_5=reading.pm2_5,
+        wind=reading.wind,
+        wind_dir=reading.wind_dir,
+        sunrise=reading.sunrise,
+        sunset=reading.sunset,
+        station=reading.station,
+        source=reading.source,
+        deltas=deltas,
+        ventilation=ventilation_advice(snapshot, reading, request.app.state.config),
+    )
+
+
+@router.get("/insights", response_model=list[Insight])
+async def get_insights(request: Request):
+    return request.app.state.insights
 
 
 @router.get("/health")
