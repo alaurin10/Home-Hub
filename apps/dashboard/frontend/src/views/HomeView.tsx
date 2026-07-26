@@ -1,39 +1,43 @@
-import {
-  closestCenter,
-  DndContext,
-  PointerSensor,
-  useSensor,
-  useSensors,
-  type DragEndEvent,
-} from "@dnd-kit/core";
-import { rectSortingStrategy, SortableContext } from "@dnd-kit/sortable";
 import { motion } from "framer-motion";
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 
 import { getHistory } from "../api/client";
 import type { AppConfig, HistoryPoint } from "../api/types";
+import { Page } from "../App";
+import { Header } from "../components/Header";
+import { HouseCard } from "../components/HouseCard";
+import { InsightFeed } from "../components/InsightFeed";
+import { OutdoorCard, OutdoorStrip } from "../components/OutdoorCard";
 import { PageTransition } from "../components/PageTransition";
 import { RoomCard } from "../components/RoomCard";
 import { Skeleton } from "../components/Skeleton";
 import { useStore } from "../store";
 
+// Recharts is roughly half the bundle and the compare panel is the only thing
+// on Home that needs it — below the fold, and absent entirely on mobile. Lazy
+// so first paint (score, rooms, insights) still ships without it.
+const ComparePanel = lazy(() =>
+  import("../components/ComparePanel").then((m) => ({ default: m.ComparePanel })),
+);
+
 // The card stagger is a first-impression flourish; returning from a room
-// shouldn't replay it (or stack its transforms on dnd-kit's).
+// shouldn't replay it.
 let gridHasAnimated = false;
 
-// Metrics every card's rotating sparkline cycles through.
+// Metrics every card's trend row plots.
 export const SPARK_METRICS = ["temperature", "humidity", "co2"] as const;
 
-const SPARK_HOURS = 3;
+// 24h, matching the "24h delta" the card prints beside each trend.
+const SPARK_HOURS = 24;
 const SPARK_REFRESH_MS = 5 * 60 * 1000;
 
 // Module-level cache (same idiom as gridHasAnimated): Home → Room → back
-// paints sparklines instantly instead of refetching a 3h window that can't
-// have meaningfully changed.
+// paints sparklines instantly instead of refetching a window that cannot have
+// meaningfully changed.
 let sparkCache: { at: number; series: Record<string, HistoryPoint[]> } | null = null;
 
-/** One batched 3h history fetch for every card's sparkline metrics —
- * replaces N per-card self-polling fetches — refreshed on one interval. */
+/** One batched history fetch for every card's trend metrics — replaces N
+ * per-card self-polling fetches — refreshed on one interval. */
 function useHomeHistory(config: AppConfig | null): Record<string, HistoryPoint[]> | null {
   const [series, setSeries] = useState(sparkCache?.series ?? null);
 
@@ -44,7 +48,7 @@ function useHomeHistory(config: AppConfig | null): Record<string, HistoryPoint[]
       SPARK_METRICS.map((m) => r.entities[m]).filter(Boolean),
     );
     const load = () =>
-      getHistory(entities, SPARK_HOURS, 120)
+      getHistory(entities, SPARK_HOURS, 144)
         .then((h) => {
           sparkCache = { at: Date.now(), series: h.series };
           if (alive) setSeries(h.series);
@@ -63,8 +67,7 @@ function useHomeHistory(config: AppConfig | null): Record<string, HistoryPoint[]
 }
 
 export function HomeView() {
-  const { config, rooms, layout, editMode, moveCard, toggleSize } = useStore();
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
+  const { config, rooms, outdoor, insights, settings } = useStore();
   const history = useHomeHistory(config);
 
   useEffect(() => {
@@ -73,64 +76,84 @@ export function HomeView() {
 
   if (!config || !rooms)
     return (
-      <main className="mx-auto max-w-5xl px-5 pb-24 pt-4 md:pb-10">
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-2">
-          <Skeleton className="h-44" />
-          <Skeleton className="h-44" />
-          <Skeleton className="h-44" />
+      <Page>
+        <Skeleton className="h-52" />
+        <div className="grid gap-5 lg:grid-cols-3">
+          <Skeleton className="h-72" />
+          <Skeleton className="h-72" />
+          <Skeleton className="h-72" />
         </div>
-      </main>
+      </Page>
     );
 
-  const byId = Object.fromEntries(rooms.rooms.map((r) => [r.id, r]));
-  const cards = layout.filter((c) => byId[c.id]);
-
-  const onDragEnd = (ev: DragEndEvent) => {
-    const { active, over } = ev;
-    if (!over || active.id === over.id) return;
-    moveCard(
-      cards.findIndex((c) => c.id === active.id),
-      cards.findIndex((c) => c.id === over.id),
-    );
-  };
+  const scale = settings?.scale ?? "F";
 
   return (
-    <main className="mx-auto max-w-5xl px-5 pb-24 pt-4 md:pb-10">
+    <Page>
       <PageTransition>
-        {editMode && (
-          <p className="mb-3 text-sm text-muted">Drag cards to reorder · toggle width per card</p>
-        )}
-        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
-          <SortableContext items={cards.map((c) => c.id)} strategy={rectSortingStrategy}>
-            <motion.div
-              className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-2"
-              initial={gridHasAnimated ? false : "hidden"}
-              animate="show"
-              variants={{ show: { transition: { staggerChildren: 0.06 } } }}
-            >
-              {cards.map((card) => (
-                <motion.div
-                  key={card.id}
-                  variants={{
-                    hidden: { opacity: 0, y: 14 },
-                    show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 250, damping: 24 } },
-                  }}
-                  className={card.size === "wide" ? "sm:col-span-2" : ""}
-                >
-                  <RoomCard
-                    room={byId[card.id]}
-                    config={config}
-                    size={card.size}
-                    editMode={editMode}
-                    history={history}
-                    onToggleSize={() => toggleSize(card.id)}
-                  />
-                </motion.div>
-              ))}
-            </motion.div>
-          </SortableContext>
-        </DndContext>
+        <div className="flex flex-col gap-5 max-lg:gap-3.5">
+          <Header kicker="Overview" title="Today at home" />
+
+          {/* Hero: the score answers "is the house OK" and the outdoor card
+              answers "would opening a window help" — the two questions the
+              rest of the page is evidence for. */}
+          <div className="grid gap-5 max-lg:gap-3.5 lg:grid-cols-[minmax(0,1.62fr)_minmax(0,1fr)]">
+            {/* Compact below lg: a 152px arc beside a 23px headline does not
+                fit 390px, and the desktop stat strip wraps into nonsense. */}
+            <div className="max-lg:hidden">
+              <HouseCard rooms={rooms} config={config} scale={scale} />
+            </div>
+            <div className="lg:hidden">
+              <HouseCard rooms={rooms} config={config} scale={scale} compact />
+            </div>
+            <div className="max-lg:hidden">
+              <OutdoorCard outdoor={outdoor} scale={scale} />
+            </div>
+            <div className="lg:hidden">
+              <OutdoorStrip outdoor={outdoor} scale={scale} />
+            </div>
+          </div>
+
+          <motion.div
+            className="grid gap-5 max-lg:gap-3 lg:grid-cols-3"
+            initial={gridHasAnimated ? false : "hidden"}
+            animate="show"
+            variants={{ show: { transition: { staggerChildren: 0.06 } } }}
+          >
+            {rooms.rooms.map((room) => (
+              <motion.div
+                key={room.id}
+                variants={{
+                  hidden: { opacity: 0, y: 14 },
+                  show: {
+                    opacity: 1,
+                    y: 0,
+                    transition: { type: "spring", stiffness: 250, damping: 24 },
+                  },
+                }}
+              >
+                {/* Compact below lg: the desktop card's three trend columns
+                    and chips do not survive a 390px width. */}
+                <div className="max-lg:hidden">
+                  <RoomCard room={room} config={config} history={history} scale={scale} />
+                </div>
+                <div className="lg:hidden">
+                  <RoomCard room={room} config={config} history={history} scale={scale} compact />
+                </div>
+              </motion.div>
+            ))}
+          </motion.div>
+
+          <div className="grid min-w-0 gap-5 max-lg:gap-3.5 lg:grid-cols-[minmax(0,2.1fr)_minmax(0,1fr)]">
+            <div className="max-lg:hidden">
+              <Suspense fallback={<Skeleton className="h-[440px]" />}>
+                <ComparePanel />
+              </Suspense>
+            </div>
+            <InsightFeed insights={insights} />
+          </div>
+        </div>
       </PageTransition>
-    </main>
+    </Page>
   );
 }

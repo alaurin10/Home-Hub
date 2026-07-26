@@ -16,11 +16,28 @@ export interface NodeStatus {
   missing: string[];
 }
 
+export type ScoreBand = "excellent" | "good" | "fair" | "poor";
+
+export interface ScorePart {
+  metric: string;
+  label: string;   // "CO₂"
+  detail: string;  // "1,140 ppm vs 800 target" — printed verbatim, never re-derived
+  penalty: number;
+}
+
+export interface RoomScore {
+  value: number;
+  band: ScoreBand;
+  parts: ScorePart[];
+}
+
 export interface RoomSnapshot {
   id: string;
   name: string;
   metrics: Record<string, MetricValue>;
   node: NodeStatus;
+  /** null for an offline node — render the offline state, not a stale 100. */
+  score: RoomScore | null;
 }
 
 export interface FleetStatus {
@@ -28,9 +45,68 @@ export interface FleetStatus {
   problem: boolean;
 }
 
+export interface HouseSummary {
+  score: number;
+  band: ScoreBand;
+  worst_room: string | null;
+  headline: string;
+  advisory: string;
+}
+
 export interface RoomsResponse {
   rooms: RoomSnapshot[];
   fleet: FleetStatus;
+  house: HouseSummary;
+}
+
+export interface AppSettings {
+  location: string;
+  scale: "F" | "C";
+  /** Resolved server-side; null means the location matched nothing. */
+  station: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  /** IANA zone of the resolved place — sun times are formatted in it. */
+  timezone: string | null;
+}
+
+export interface OutdoorDelta {
+  label: string;
+  text: string;
+  fraction: number; // 0–1 bar fill
+}
+
+export interface Ventilation {
+  recommended: boolean;
+  title: string;
+  body: string;
+}
+
+export interface Outdoor {
+  temp: number | null;
+  humidity: number | null;
+  aqi: number | null;
+  pm2_5: number | null;
+  wind: number | null;
+  wind_dir: string | null;
+  sunrise: string | null;
+  sunset: string | null;
+  station: string | null;
+  source: string;
+  deltas: OutdoorDelta[];
+  ventilation: Ventilation | null;
+}
+
+export type InsightKind = "action" | "likely" | "measured";
+
+export interface Insight {
+  id: string;
+  kind: InsightKind;
+  text: string;
+  when: string;
+  evidence: string[];
+  room_id: string | null;
+  color_role: "good" | "fair" | "poor" | "series_1" | "series_2" | "muted";
 }
 
 export interface RoomConfig {
@@ -93,3 +169,11 @@ export interface StateEvent {
   value: number | string | null;
   ts: number;
 }
+
+/** Sent when the server's insight set changes, so open dashboards refetch
+ * instead of polling for a feed that moves a few times a day. */
+export interface InsightsEvent {
+  type: "insights";
+}
+
+export type StreamMessage = StateEvent | InsightsEvent;

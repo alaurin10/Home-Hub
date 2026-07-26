@@ -1,43 +1,52 @@
+import { Page } from "../App";
+import { Header } from "../components/Header";
 import { NodeCard } from "../components/NodeCard";
 import { PageTransition } from "../components/PageTransition";
 import { Skeleton } from "../components/Skeleton";
 import { useStore } from "../store";
 
 export function SystemView() {
-  const rooms = useStore((s) => s.rooms);
-  if (!rooms)
+  const { rooms, config } = useStore();
+  if (!rooms || !config)
     return (
-      <main className="mx-auto max-w-5xl px-5 pb-24 pt-4 md:pb-10">
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <Skeleton className="h-32" />
-          <Skeleton className="h-32" />
-          <Skeleton className="h-32" />
+      <Page>
+        <div className="grid gap-5 lg:grid-cols-3">
+          <Skeleton className="h-56" />
+          <Skeleton className="h-56" />
+          <Skeleton className="h-56" />
         </div>
-      </main>
+      </Page>
     );
 
   const healthy = !rooms.fleet.problem;
+  const reporting = rooms.rooms.length - rooms.fleet.stale_nodes.length;
 
   return (
-    <main className="mx-auto max-w-5xl px-5 pb-24 pt-4 md:pb-10">
+    <Page>
       <PageTransition>
-        <div className="mb-4 flex items-center justify-between">
-          <h1 className="text-xl font-semibold tracking-tight text-ink">Sensor fleet</h1>
+        <div className="flex flex-col gap-5 max-lg:gap-3.5">
+          <Header kicker="Diagnostics" title="Sensor fleet" />
           <span className="inline-flex items-center gap-1.5 text-sm font-medium text-ink-2">
             <span
               aria-hidden
               className="h-2 w-2 rounded-full"
               style={{ background: healthy ? "var(--status-good)" : "var(--status-bad)" }}
             />
-            {healthy ? "All nodes reporting" : `${rooms.fleet.stale_nodes.length} node(s) down`}
+            {healthy
+              ? `${reporting} of ${rooms.rooms.length} reporting`
+              : `${rooms.fleet.stale_nodes.length} node(s) down`}
           </span>
-        </div>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          {rooms.rooms.map((room) => (
-            <NodeCard key={room.id} room={room} />
-          ))}
+          <div className="grid gap-5 max-lg:gap-3.5 lg:grid-cols-3">
+            {rooms.rooms.map((room) => (
+              <NodeCard
+                key={room.id}
+                room={room}
+                entities={Object.values(config.rooms.find((r) => r.id === room.id)?.entities ?? {})}
+              />
+            ))}
+          </div>
         </div>
       </PageTransition>
-    </main>
+    </Page>
   );
 }

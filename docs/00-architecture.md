@@ -415,9 +415,10 @@ hosting wins on **retention + privacy**.
 - **Custom dashboard app (`apps/dashboard/`)** — the deep-history/analytics
   layer (**InfluxDB + Grafana served this role until removed, July 2026**): a
   FastAPI + React app (added July 2026) with live view via HA's WS API, short
-  history via REST, long history via HA long-term statistics; drag-and-drop
-  layout persisted server-side; first-class demo mode (runs before any
-  hardware exists). Ships as a compose stack on the **Docker host VM**, reached
+  history via REST, long history via HA long-term statistics; a server-derived
+  air score and rule-based "what happened today" feed; outdoor context from
+  public weather stations (NWS + Open-Meteo, keyless) for a location set in the
+  app; first-class demo mode (runs before any hardware exists). Ships as a compose stack on the **Docker host VM**, reached
   via the same Tailscale/Cloudflare Access posture (HA token server-side, no
   app auth, no inbound ports). **Monorepo exception**: it lives in this repo
   rather than a separate one because it shares the entity registry (§7),

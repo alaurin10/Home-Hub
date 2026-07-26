@@ -128,6 +128,34 @@ def test_sun_times_handle_the_polar_day():
     assert sun_times(78.2, 15.6, date(2026, 6, 21)) == (None, None)
 
 
+def test_sun_times_read_in_the_locations_clock_not_the_hosts():
+    """A hub running in UTC must not report a Massachusetts sunrise at 9:31 AM.
+    The geocoder gives us the IANA zone; sun times are formatted in it."""
+    rise, set_ = sun_times(42.3751, -71.1056, date(2026, 7, 26), timezone="America/New_York")
+    assert rise.endswith("AM") and set_.endswith("PM")
+    assert int(rise.split(":")[0]) in (5, 6)   # ~5:3x AM EDT
+    assert int(set_.split(":")[0]) in (7, 8)   # ~8:0x PM EDT
+
+
+def test_sun_times_fall_back_to_the_host_zone_for_an_unknown_one():
+    # A junk zone degrades rather than raising — the caption is not worth a 500.
+    assert sun_times(42.3751, -71.1056, date(2026, 7, 26), timezone="Mars/Olympus") == sun_times(
+        42.3751, -71.1056, date(2026, 7, 26)
+    )
+
+
+def test_geocode_carries_the_timezone_through():
+    hit = {
+        "name": "Cambridge",
+        "latitude": 42.37,
+        "longitude": -71.1,
+        "admin1": "Massachusetts",
+        "country_code": "US",
+        "timezone": "America/New_York",
+    }
+    assert _pick_result([hit], "MA")["timezone"] == "America/New_York"
+
+
 def test_geocode_accepts_raw_coordinates_without_a_network_call(monkeypatch):
     import asyncio
 
@@ -168,6 +196,33 @@ def test_provider_survives_every_upstream_failing(monkeypatch):
 
     monkeypatch.setattr(weather, "_get", dead)
     assert asyncio.run(StationOutdoorProvider().fetch(CAMBRIDGE)) is None
+
+
+def test_provider_takes_the_timezone_from_nws_points(monkeypatch):
+    """Raw coordinates carry no zone, so /points' timeZone is the only thing
+    standing between a Massachusetts sunrise and the host's UTC clock."""
+    import asyncio
+
+    async def fake(client, url, **kwargs):
+        if "/points/" in url:
+            return {"properties": {"timeZone": "America/New_York", "observationStations": "stations-url"}}
+        if url == "stations-url":
+            return {
+                "features": [
+                    {
+                        "properties": {"stationIdentifier": "KBOS", "name": "Logan"},
+                        "geometry": {"coordinates": [-71.0097, 42.3606]},
+                    }
+                ]
+            }
+        if "observations/latest" in url:
+            return NWS_OBSERVATION
+        return None
+
+    monkeypatch.setattr(weather, "_get", fake)
+    reading = asyncio.run(StationOutdoorProvider().fetch(CAMBRIDGE))
+    assert reading.sunrise.endswith("AM") and int(reading.sunrise.split(":")[0]) in (4, 5, 6, 7)
+    assert reading.station.startswith("KBOS · ")
 
 
 def test_provider_still_reports_when_only_air_quality_answers(monkeypatch):

@@ -1,96 +1,80 @@
-import { motion } from "framer-motion";
-import { useState } from "react";
-import { NavLink, useLocation } from "react-router-dom";
+import { Settings as SettingsIcon } from "lucide-react";
 
+import { formatValue } from "../lib/format";
+import { displayTemp, scaleOf, tempUnit } from "../lib/scale";
 import { useStore } from "../store";
-import { ComfortSettings } from "./ComfortSettings";
+import { aqiColor } from "./OutdoorCard";
 import { LiveDot } from "./LiveDot";
 
-function GearIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
-      <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="2" />
-      <path
-        d="M12 2.5v2.2M12 19.3v2.2M21.5 12h-2.2M4.7 12H2.5M18.7 5.3l-1.6 1.6M6.9 17.1l-1.6 1.6M18.7 18.7l-1.6-1.6M6.9 6.9L5.3 5.3"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-      />
-    </svg>
-  );
-}
+const today = () =>
+  new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
 
-const TABS = [
-  { to: "/", label: "Home" },
-  { to: "/system", label: "System" },
-];
-
-const pillSpring = { type: "spring" as const, stiffness: 420, damping: 34 };
-
-export function Header() {
-  const { config, connected, editMode, setEditMode } = useStore();
-  const location = useLocation();
-  const onHome = location.pathname === "/";
-  const [settingsOpen, setSettingsOpen] = useState(false);
+/**
+ * The per-view header. On desktop it carries the kicker/title pair plus two
+ * chrome pills (outdoor summary, date); on mobile it collapses to the title,
+ * the live dot and the settings gear, since the rail is not there to hold them.
+ */
+export function Header({ kicker, title }: { kicker: string; title: string }) {
+  const { outdoor, settings, connected, openSettings } = useStore();
+  const scale = scaleOf(settings);
 
   return (
-    <header className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-5 pb-2 pt-5">
-      <div className="flex items-baseline gap-3">
-        <h1 className="text-xl font-semibold tracking-tight text-ink">
-          {config?.house_name ?? "Home"}
+    <header className="flex items-end justify-between gap-6">
+      <div>
+        <div className="text-[11.5px] font-semibold uppercase tracking-[.1em] text-muted max-lg:hidden">
+          {kicker}
+        </div>
+        <h1 className="mt-1 font-semibold leading-[1.05] tracking-[-.022em] text-ink max-lg:mt-0 max-lg:text-[27px] max-lg:tracking-[-.025em] lg:text-[30px]">
+          {title}
         </h1>
-        <span className="hidden text-sm text-muted sm:inline">
-          {new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
-        </span>
+        <div className="mt-[5px] text-[12.5px] text-muted lg:hidden">{today()}</div>
       </div>
 
-      <div className="flex items-center gap-3">
-        <span className="glass-chrome rounded-full px-3 py-1.5">
+      <div className="flex items-center gap-2.5">
+        <div className="lg:hidden">
           <LiveDot connected={connected} />
-        </span>
-        <nav className="glass-chrome hidden items-center gap-1 rounded-full p-1 md:flex">
-          {TABS.map((tab) => (
-            <NavLink key={tab.to} to={tab.to} className="relative rounded-full px-3.5 py-1.5 text-sm font-medium">
-              {({ isActive }) => (
-                <>
-                  {isActive && (
-                    <motion.span
-                      layoutId="header-nav-pill"
-                      transition={pillSpring}
-                      className="absolute inset-0 rounded-full bg-ink"
-                    />
-                  )}
+        </div>
+        {outdoor && (
+          <span className="glass-chrome inline-flex items-center gap-[9px] rounded-full p-[8px_15px] text-[12.5px] text-ink-2 max-lg:hidden">
+            <span className="text-muted">Outside</span>
+            {outdoor.temp !== null && (
+              <span className="tnum font-semibold">
+                {formatValue(displayTemp(outdoor.temp, scale), 0)}
+                {tempUnit(scale)}
+              </span>
+            )}
+            {outdoor.humidity !== null && (
+              <>
+                <span aria-hidden className="h-3 w-px bg-hairline" />
+                <span className="tnum">{formatValue(outdoor.humidity, 0)}%</span>
+              </>
+            )}
+            {outdoor.aqi !== null && (
+              <>
+                <span aria-hidden className="h-3 w-px bg-hairline" />
+                <span className="inline-flex items-center gap-1.5">
                   <span
-                    className={`relative transition-colors duration-200 ${
-                      isActive ? "text-surface" : "text-muted hover:text-ink-2"
-                    }`}
-                  >
-                    {tab.label}
-                  </span>
-                </>
-              )}
-            </NavLink>
-          ))}
-        </nav>
-        <button
-          onClick={() => setSettingsOpen(true)}
-          aria-label="Comfort settings"
-          className="glass-chrome rounded-full p-2 text-ink-2 transition-colors hover:text-ink"
-        >
-          <GearIcon />
-        </button>
-        {onHome && (
-          <button
-            onClick={() => setEditMode(!editMode)}
-            className={`rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors ${
-              editMode ? "bg-ink text-surface" : "glass-chrome text-ink-2 hover:text-ink"
-            }`}
-          >
-            {editMode ? "Done" : "Edit"}
-          </button>
+                    aria-hidden
+                    className="h-[7px] w-[7px] rounded-full"
+                    style={{ background: aqiColor(outdoor.aqi) }}
+                  />
+                  AQI {formatValue(outdoor.aqi, 0)}
+                </span>
+              </>
+            )}
+          </span>
         )}
+        <span className="tnum glass-chrome rounded-full p-[8px_15px] text-[12.5px] text-muted max-lg:hidden">
+          {today()}
+        </span>
+        <button
+          onClick={() => openSettings()}
+          aria-label="Settings"
+          className="glass-chrome flex h-[34px] w-[34px] items-center justify-center rounded-full text-ink-2 lg:hidden"
+        >
+          <SettingsIcon size={15} strokeWidth={2} />
+        </button>
       </div>
-      <ComfortSettings open={settingsOpen} onClose={() => setSettingsOpen(false)} />
     </header>
   );
 }

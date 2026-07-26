@@ -32,17 +32,6 @@ function timeOfDay(date: Date): string {
   });
 }
 
-/** Axis tick label. Once the window crosses midnight the day must be
- * readable: a 48h axis of bare clock times repeats and turns ambiguous. */
-export function tickLabel(ts: number, hours: number): string {
-  const date = new Date(ts * 1000);
-  if (hours > 48) return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-  if (hours > 24 && date.getHours() === 0 && date.getMinutes() === 0) {
-    return date.toLocaleDateString("en-US", { weekday: "short" });
-  }
-  return timeOfDay(date);
-}
-
 /** Tooltip header: always full day context, plus the stats bucket size. */
 export function tooltipLabel(ts: number, kind: "raw" | "stats"): string {
   const date = new Date(ts * 1000);
@@ -52,4 +41,10 @@ export function tooltipLabel(ts: number, kind: "raw" | "stats"): string {
     return `${day} · ${hour} (hourly)`;
   }
   return `${day} · ${timeOfDay(date)}`;
+}
+
+/** Signed delta for a trend caption: "+1.4", "−32". The minus is U+2212, which
+ * lines up with digits where a hyphen does not. */
+export function signedDelta(value: number, digits = 0): string {
+  return `${value >= 0 ? "+" : "−"}${formatValue(Math.abs(value), digits)}`;
 }

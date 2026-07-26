@@ -21,8 +21,10 @@ import asyncio
 import math
 import time
 from dataclasses import dataclass, field
-from datetime import date, datetime, timezone
+from datetime import date, datetime, tzinfo
+from datetime import timezone as _tz
 from typing import Any, Protocol
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import httpx
 
@@ -48,6 +50,12 @@ class Place:
     latitude: float
     longitude: float
     label: str            # "Cambridge, Massachusetts, US" — echoed back to the user
+    # IANA zone from the geocoder. Sun times are only meaningful in the
+    # *location's* clock: a dashboard hosted in UTC would otherwise report
+    # sunrise at 9:31 AM for Massachusetts. None falls back to the host's zone,
+    # which is right for the common case of a hub sitting in the house it
+    # measures.
+    timezone: str | None = None
 
 
 @dataclass
@@ -122,13 +130,32 @@ def _nws_quantity(prop: Any, converters: dict[str, Any]) -> float | None:
 
 # --- sun times ------------------------------------------------------------
 
-def sun_times(latitude: float, longitude: float, on: date | None = None) -> tuple[str | None, str | None]:
-    """Local sunrise/sunset as "5:18 AM" strings, from the NOAA sunrise equation.
+def zone_of(timezone: str | None) -> tzinfo | None:
+    """The location's zone, or None for "use the host's". An unknown zone name
+    degrades to the host rather than raising."""
+    if not timezone:
+        return None
+    try:
+        return ZoneInfo(timezone)
+    except (ZoneInfoNotFoundError, ValueError):
+        return None
+
+
+def local_now(timezone: str | None = None) -> datetime:
+    return datetime.now(tz=zone_of(timezone)) if timezone else datetime.now()
+
+
+def sun_times(
+    latitude: float, longitude: float, on: date | None = None, timezone: str | None = None
+) -> tuple[str | None, str | None]:
+    """Sunrise/sunset as "5:18 AM" strings in the location's local clock, from
+    the NOAA sunrise equation.
 
     Computed rather than fetched: it needs no network, is exact enough for a
     dashboard caption, and keeps one fewer request in the 10-minute poll. Polar
     day/night returns (None, None) rather than a fabricated time."""
-    on = on or datetime.now().date()
+    zone = zone_of(timezone)
+    on = on or local_now(timezone).date()
     n = on.toordinal() - date(2000, 1, 1).toordinal() + 0.0008
     j_star = n - longitude / 360.0
     m = (357.5291 + 0.98560028 * j_star) % 360.0
@@ -148,10 +175,11 @@ def sun_times(latitude: float, longitude: float, on: date | None = None) -> tupl
     omega = math.degrees(math.acos(cos_omega))
 
     def _local(julian: float) -> str:
-        # Julian day -> UTC instant -> the host's local clock, which is the
-        # timezone every other time in this app is reasoned in.
+        # Julian day -> UTC instant -> the location's clock (or the host's when
+        # the geocoder gave us no zone).
         unix = (julian - 2440587.5) * 86400.0
-        return datetime.fromtimestamp(unix, tz=timezone.utc).astimezone().strftime("%-I:%M %p")
+        moment = datetime.fromtimestamp(unix, tz=_tz.utc)
+        return (moment.astimezone(zone) if zone else moment.astimezone()).strftime("%-I:%M %p")
 
     return _local(j_transit - omega / 360.0), _local(j_transit + omega / 360.0)
 
@@ -197,6 +225,7 @@ async def geocode(query: str) -> Place | None:
                     latitude=float(hit["latitude"]),
                     longitude=float(hit["longitude"]),
                     label=_place_label(hit),
+                    timezone=hit.get("timezone"),
                 )
     return None
 
@@ -209,6 +238,10 @@ class StationOutdoorProvider:
 
     def __init__(self) -> None:
         self._station: dict[tuple[float, float], tuple[str, float, float, str] | None] = {}
+        # /points also names the point's IANA zone. Worth keeping: it is the
+        # only zone we get when the user typed raw coordinates, and without one
+        # sun times fall back to the host's clock.
+        self._zone: dict[tuple[float, float], str | None] = {}
 
     async def _resolve_station(
         self, client: httpx.AsyncClient, place: Place
@@ -219,7 +252,9 @@ class StationOutdoorProvider:
         if key in self._station:
             return self._station[key]
         point = await _get(client, f"{NWS_POINTS_URL}/{place.latitude:.4f},{place.longitude:.4f}")
-        stations_url = ((point or {}).get("properties") or {}).get("observationStations")
+        point_props = (point or {}).get("properties") or {}
+        self._zone[key] = point_props.get("timeZone")
+        stations_url = point_props.get("observationStations")
         resolved = None
         if stations_url:
             listing = await _get(client, stations_url)
@@ -238,9 +273,14 @@ class StationOutdoorProvider:
         return resolved
 
     async def fetch(self, place: Place) -> OutdoorReading | None:
-        sunrise, sunset = sun_times(place.latitude, place.longitude)
         async with httpx.AsyncClient(headers={"User-Agent": USER_AGENT}) as client:
             station = await self._resolve_station(client, place)
+            # Prefer the geocoder's zone; fall back to the one /points reported,
+            # which is what covers a location entered as raw coordinates.
+            zone = place.timezone or self._zone.get(
+                (round(place.latitude, 3), round(place.longitude, 3))
+            )
+            sunrise, sunset = sun_times(place.latitude, place.longitude, timezone=zone)
             observation = None
             if station:
                 station_id = station[0]
@@ -380,12 +420,12 @@ class SimOutdoorProvider:
     a real station reading."""
 
     async def fetch(self, place: Place) -> OutdoorReading | None:
-        now = datetime.now()
+        now = local_now(place.timezone)
         hod = now.hour + now.minute / 60.0
         wobble = (settings.SIM_SEED % 7) - 3
         temp = 66.0 + 9.0 * math.sin(2 * math.pi * (hod - 9.8) / 24.0) + wobble * 0.4
         humidity = 61.0 - 11.0 * math.sin(2 * math.pi * (hod - 9.8) / 24.0)
-        sunrise, sunset = sun_times(place.latitude, place.longitude)
+        sunrise, sunset = sun_times(place.latitude, place.longitude, timezone=place.timezone)
         return OutdoorReading(
             temp=round(temp, 1),
             humidity=round(humidity),

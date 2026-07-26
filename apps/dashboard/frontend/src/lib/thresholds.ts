@@ -77,3 +77,80 @@ export const METRIC_LABEL: Record<string, string> = {
   pm2_5: "PM2.5",
   pm10: "PM10",
 };
+
+/** Short forms for segmented controls and pill rails, where the full label
+ * would wrap. */
+export const METRIC_SHORT: Record<string, string> = {
+  ...METRIC_LABEL,
+  temperature: "Temp",
+  absolute_humidity: "Abs. humidity",
+  voc: "VOC",
+  nox: "NOx",
+};
+
+/** Decimals each metric is read at. A CO₂ reading to one decimal implies a
+ * precision the sensor does not have. */
+export const METRIC_DIGITS: Record<string, number> = {
+  co2: 0,
+  temperature: 1,
+  humidity: 0,
+  dew_point: 1,
+  absolute_humidity: 1,
+  voc: 0,
+  nox: 0,
+  pm1_0: 1,
+  pm2_5: 1,
+  pm10: 0,
+};
+
+/** Plot floor/ceiling per metric — the span a progress track represents.
+ * CO₂ starts at 400 (the outdoor baseline), not 0: no indoor room ever reads
+ * lower, so a bar from zero would spend a quarter of its length on nothing. */
+export const METRIC_RANGE: Record<string, [number, number]> = {
+  co2: [400, 2000],
+  temperature: [55, 90],
+  humidity: [20, 80],
+  dew_point: [30, 70],
+  absolute_humidity: [0, 20],
+  voc: [0, 400],
+  nox: [0, 300],
+  pm1_0: [0, 55],
+  pm2_5: [0, 55],
+  pm10: [0, 150],
+};
+
+/** Where a reading sits between its floor and ceiling, as a 0–100 percentage
+ * clamped so a value at the floor still shows a sliver of track. */
+export function trackPercent(metric: string, value: number | null): number {
+  if (value === null) return 0;
+  const [lo, hi] = METRIC_RANGE[metric] ?? [0, 100];
+  return Math.max(3, Math.min(100, ((value - lo) / (hi - lo)) * 100));
+}
+
+/** Unit for a metric, from config where possible. Temperature is deliberately
+ * excluded — it is scale-dependent and comes from lib/scale.ts. */
+export function unitFor(config: AppConfig, metric: string): string {
+  if (metric === "humidity") return "%";
+  if (metric === "absolute_humidity") return "g/m³";
+  return config.thresholds[metric]?.unit ?? "";
+}
+
+/** Tint used behind chips and badges: the status color at low alpha. */
+export const tint = (color: string, percent = 13) =>
+  `color-mix(in srgb, ${color} ${percent}%, transparent)`;
+
+/** Score bands reuse the four status colors; "excellent" shares good's green
+ * rather than introducing a fifth signal color. */
+export const SCORE_BAND_COLOR: Record<string, string> = {
+  excellent: "var(--status-good)",
+  good: "var(--status-good)",
+  fair: "var(--status-fair)",
+  poor: "var(--status-poor)",
+};
+
+export const SCORE_BAND_LABEL: Record<string, string> = {
+  excellent: "Excellent",
+  good: "Good",
+  fair: "Fair",
+  poor: "Poor",
+};

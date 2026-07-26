@@ -99,6 +99,9 @@ class Settings(BaseModel):
     station: str | None = None        # "KBOS · 2.4 mi"
     latitude: float | None = None
     longitude: float | None = None
+    # IANA zone of the resolved place, so sun times read in the location's
+    # clock rather than the host's.
+    timezone: str | None = None
 
 
 class OutdoorDelta(BaseModel):

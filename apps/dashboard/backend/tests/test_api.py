@@ -182,6 +182,7 @@ def test_settings_default_is_blank(tmp_path):
             "station": None,
             "latitude": None,
             "longitude": None,
+            "timezone": None,
         }
 
 

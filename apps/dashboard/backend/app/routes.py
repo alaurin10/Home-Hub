@@ -282,16 +282,18 @@ async def put_settings(request: Request, update: Settings):
         pass  # cleared: drop the resolved coordinates with it
     elif saved.location == current.location and current.latitude is not None:
         # Unchanged location keeps its resolution — no geocode call per save.
-        saved.station, saved.latitude, saved.longitude = (
+        saved.station, saved.latitude, saved.longitude, saved.timezone = (
             current.station,
             current.latitude,
             current.longitude,
+            current.timezone,
         )
     else:
         place = await geocode(saved.location)
         if place is not None:
             saved.latitude, saved.longitude = place.latitude, place.longitude
             saved.station = place.label
+            saved.timezone = place.timezone
         # A location that resolved to nothing is saved as typed with no
         # coordinates, so the UI can show "couldn't match that" rather than
         # silently keeping the old place.
@@ -308,6 +310,7 @@ def _place_of(current: Settings) -> Place | None:
         latitude=current.latitude,
         longitude=current.longitude,
         label=current.station or current.location,
+        timezone=current.timezone,
     )
 
 
