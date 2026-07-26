@@ -22,6 +22,7 @@ VIEWPORTS = {
 PAGES = {
     "home": "/",
     "room": "/room/kitchen",
+    "compare": "/compare",
     "system": "/system",
 }
 

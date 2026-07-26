@@ -141,3 +141,103 @@ def test_thresholds_reject_wrong_shape(tmp_path):
         # temperature is band-shaped (ranges); bounds must be refused.
         bad = {"thresholds": {"temperature": {"bounds": [60, 70, 80]}}}
         assert client.put("/api/thresholds", json=bad).status_code == 400
+
+
+def test_rooms_carry_scores_and_a_house_summary(tmp_path):
+    with make_client(tmp_path) as client:
+        data = client.get("/api/rooms").json()
+        house = data["house"]
+        assert 0 <= house["score"] <= 100
+        assert house["band"] in ("excellent", "good", "fair", "poor")
+        assert house["headline"] and house["advisory"]
+        assert house["worst_room"] in {r["name"] for r in data["rooms"]}
+        for room in data["rooms"]:
+            score = room["score"]
+            assert 0 <= score["value"] <= 100
+            # The parts are what the Settings tab renders — they must be there.
+            assert {p["metric"] for p in score["parts"]} <= {
+                "co2", "pm2_5", "voc", "temperature", "humidity"
+            }
+            assert all(p["detail"] for p in score["parts"])
+
+
+def test_offline_room_has_no_score(tmp_path, monkeypatch):
+    from app import settings
+
+    monkeypatch.setattr(settings, "SIM_FAULT", "bedroom")
+    with make_client(tmp_path) as client:
+        data = client.get("/api/rooms").json()
+        bedroom = next(r for r in data["rooms"] if r["id"] == "bedroom")
+        # None, never a fabricated 100 from stale readings.
+        assert bedroom["score"] is None
+        assert next(r for r in data["rooms"] if r["id"] == "kitchen")["score"] is not None
+
+
+def test_settings_default_is_blank(tmp_path):
+    with make_client(tmp_path) as client:
+        data = client.get("/api/settings").json()
+        assert data == {
+            "location": "",
+            "scale": "F",
+            "station": None,
+            "latitude": None,
+            "longitude": None,
+            "timezone": None,
+        }
+
+
+def test_settings_roundtrip_and_persistence(tmp_path, monkeypatch):
+    from app.providers import weather
+
+    async def no_network(client, url, **kwargs):
+        return None  # geocoding unavailable: the location still saves as typed
+
+    monkeypatch.setattr(weather, "_get", no_network)
+    with make_client(tmp_path) as client:
+        saved = client.put("/api/settings", json={"location": "Cambridge, MA", "scale": "C"}).json()
+        assert saved["location"] == "Cambridge, MA"
+        assert saved["scale"] == "C"
+        assert saved["latitude"] is None  # nothing matched, and it says so
+    with make_client(tmp_path) as client:
+        assert client.get("/api/settings").json()["location"] == "Cambridge, MA"
+
+
+def test_settings_accepts_raw_coordinates(tmp_path):
+    with make_client(tmp_path) as client:
+        saved = client.put("/api/settings", json={"location": "42.3751,-71.1056"}).json()
+        assert saved["latitude"] == 42.3751 and saved["longitude"] == -71.1056
+
+
+def test_settings_rejects_an_unknown_scale(tmp_path):
+    with make_client(tmp_path) as client:
+        assert client.put("/api/settings", json={"location": "", "scale": "K"}).status_code == 400
+
+
+def test_outdoor_204s_until_a_location_is_set(tmp_path):
+    with make_client(tmp_path) as client:
+        # No fabricated card, and no 500 — the UI prompts for a location.
+        assert client.get("/api/outdoor").status_code == 204
+
+
+def test_outdoor_serves_a_reading_once_located(tmp_path):
+    with make_client(tmp_path) as client:
+        client.put("/api/settings", json={"location": "42.3751,-71.1056"})
+        data = client.get("/api/outdoor").json()
+        assert data["temp"] is not None
+        assert data["station"] and data["source"]
+        assert [d["label"] for d in data["deltas"]][:2] == [
+            "Indoor vs outdoor temp",
+            "Indoor vs outdoor RH",
+        ]
+        assert all(0 <= d["fraction"] <= 1 for d in data["deltas"])
+        assert data["ventilation"]["title"]
+
+
+def test_insights_are_computed_at_startup(tmp_path):
+    # The lifespan task runs its first pass immediately rather than after the
+    # first 5-minute sleep, so a dashboard opened at boot is not blank.
+    with make_client(tmp_path) as client:
+        body = client.get("/api/insights").json()
+        assert isinstance(body, list) and body
+        assert {row["kind"] for row in body} <= {"action", "likely", "measured"}
+        assert all(row["evidence"] for row in body)

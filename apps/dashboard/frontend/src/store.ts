@@ -1,30 +1,63 @@
 import { create } from "zustand";
 
-import { getJson, openStream, putLayout } from "./api/client";
+import { getInsights, getJson, getOutdoor, getSettings, openStream } from "./api/client";
 import type {
   AppConfig,
-  CardLayout,
-  Layout,
+  AppSettings,
+  Insight,
+  Outdoor,
   RoomsResponse,
   StateEvent,
   Threshold,
 } from "./api/types";
 
+export type CompareMetric = "temperature" | "humidity" | "co2" | "pm2_5";
+export type SettingsTab = "comfort" | "weather" | "score";
+
+// Shared by every chart on the page. Index into RANGES (lib/ranges.ts): the
+// hairline in the range control sits between 48h and 7d because that is where
+// the backend switches from raw samples to hourly means.
+const RANGE_KEY = "home-hub:rangeIdx";
+
+const SNAPSHOT_MS = 60_000;
+const OUTDOOR_MS = 10 * 60_000; // weather does not move faster than this
+const INSIGHTS_MS = 5 * 60_000; // matches the server's recompute interval
+
+function storedRangeIdx(): number {
+  // Explicit null check: Number(null) is 0, which would silently make "3h" the
+  // default for every first-time visitor.
+  const stored = localStorage.getItem(RANGE_KEY);
+  if (stored === null) return 1; // 24h
+  const idx = Number(stored);
+  return Number.isInteger(idx) && idx >= 0 && idx <= 5 ? idx : 1;
+}
+
 interface Store {
   config: AppConfig | null;
   rooms: RoomsResponse | null;
-  layout: CardLayout[];
+  outdoor: Outdoor | null;
+  insights: Insight[];
+  settings: AppSettings | null;
   connected: boolean;
-  editMode: boolean;
   ready: boolean;
   initError: string | null;
 
+  rangeIdx: number;
+  compareMetric: CompareMetric;
+  settingsOpen: boolean;
+  settingsTab: SettingsTab;
+
   init: () => Promise<void>;
-  setEditMode: (on: boolean) => void;
+  setRangeIdx: (idx: number) => void;
+  setCompareMetric: (metric: CompareMetric) => void;
+  openSettings: (tab?: SettingsTab) => void;
+  closeSettings: () => void;
+  setSettingsTab: (tab: SettingsTab) => void;
   setThresholds: (thresholds: Record<string, Threshold>) => void;
+  setSettings: (settings: AppSettings) => void;
+  refreshOutdoor: () => Promise<void>;
+  refreshInsights: () => Promise<void>;
   applyEvent: (ev: StateEvent) => void;
-  moveCard: (from: number, to: number) => void;
-  toggleSize: (id: string) => void;
 }
 
 // entity_id -> [roomId, metric] index built from config for O(1) live updates
@@ -43,20 +76,26 @@ let nodeEntityIndex: Record<string, [string, "wifi_signal" | "uptime"]> = {};
 export const useStore = create<Store>((set, get) => ({
   config: null,
   rooms: null,
-  layout: [],
+  outdoor: null,
+  insights: [],
+  settings: null,
   connected: false,
-  editMode: false,
   ready: false,
   initError: null,
 
+  rangeIdx: storedRangeIdx(),
+  compareMetric: "co2",
+  settingsOpen: false,
+  settingsTab: "comfort",
+
   init: async () => {
     set({ initError: null });
-    let config: AppConfig, rooms: RoomsResponse, layout: Layout;
+    let config: AppConfig, rooms: RoomsResponse, settings: AppSettings;
     try {
-      [config, rooms, layout] = await Promise.all([
+      [config, rooms, settings] = await Promise.all([
         getJson<AppConfig>("/api/config"),
         getJson<RoomsResponse>("/api/rooms"),
-        getJson<Layout>("/api/layout"),
+        getSettings(),
       ]);
     } catch (err) {
       // Return before the stream/poll start: a Retry that calls init() again
@@ -75,29 +114,71 @@ export const useStore = create<Store>((set, get) => ({
         if (entity) nodeEntityIndex[entity] = [room.id, field];
       }
     }
-    set({ config, rooms, layout: layout.cards, ready: true });
+    set({ config, rooms, settings, ready: true });
+
+    // Outdoor and insights are secondary context: they load after first paint
+    // and a failure leaves the rest of the dashboard untouched.
+    void get().refreshOutdoor();
+    void get().refreshInsights();
 
     openStream(
       (ev) => get().applyEvent(ev),
       (connected) => set({ connected }),
+      () => void get().refreshInsights(),
     );
-    // Snapshot refresh as a fallback (fleet status, reconnect gaps)
+    // Snapshot refresh as a fallback (fleet status, scores, reconnect gaps)
     setInterval(async () => {
       try {
         set({ rooms: await getJson<RoomsResponse>("/api/rooms") });
       } catch {
         /* transient */
       }
-    }, 60000);
+    }, SNAPSHOT_MS);
+    setInterval(() => void get().refreshOutdoor(), OUTDOOR_MS);
+    // The stream nudges on change; this only covers a dropped socket.
+    setInterval(() => void get().refreshInsights(), INSIGHTS_MS);
   },
 
-  setEditMode: (on) => set({ editMode: on }),
+  setRangeIdx: (idx) => {
+    set({ rangeIdx: idx });
+    localStorage.setItem(RANGE_KEY, String(idx));
+  },
+
+  setCompareMetric: (compareMetric) => set({ compareMetric }),
+  openSettings: (tab) => set({ settingsOpen: true, ...(tab ? { settingsTab: tab } : {}) }),
+  closeSettings: () => set({ settingsOpen: false }),
+  setSettingsTab: (settingsTab) => set({ settingsTab }),
 
   // Swap in freshly saved comfort bands so every status color recomputes
-  // immediately — no reload, no refetch of /api/config.
+  // immediately — no reload, no refetch of /api/config. The scores are
+  // server-derived from the same bands, so pull a fresh snapshot too.
   setThresholds: (thresholds) => {
     const config = get().config;
     if (config) set({ config: { ...config, thresholds } });
+    void getJson<RoomsResponse>("/api/rooms")
+      .then((rooms) => set({ rooms }))
+      .catch(() => {});
+  },
+
+  setSettings: (settings) => {
+    set({ settings });
+    void get().refreshOutdoor(); // a new location changes the station
+  },
+
+  refreshOutdoor: async () => {
+    try {
+      set({ outdoor: await getOutdoor() });
+    } catch {
+      /* the card just stays as it was */
+    }
+  },
+
+  refreshInsights: async () => {
+    try {
+      set({ insights: await getInsights() });
+    } catch {
+      /* keep the previous feed rather than blanking it */
+    }
   },
 
   applyEvent: (ev) => {
@@ -123,6 +204,10 @@ export const useStore = create<Store>((set, get) => ({
     const located = entityIndex[ev.entity_id];
     if (!located) return;
     const [roomId, metric] = located;
+    // Only the reading is patched live, never the score: the score is derived
+    // server-side from every metric at once, and recomputing it here from one
+    // changed entity is exactly the client/server drift the design forbids.
+    // The 60s snapshot brings the authoritative number.
     set({
       rooms: {
         ...rooms,
@@ -139,21 +224,5 @@ export const useStore = create<Store>((set, get) => ({
         ),
       },
     });
-  },
-
-  moveCard: (from, to) => {
-    const layout = [...get().layout];
-    const [card] = layout.splice(from, 1);
-    layout.splice(to, 0, card);
-    set({ layout });
-    void putLayout({ cards: layout });
-  },
-
-  toggleSize: (id) => {
-    const layout = get().layout.map((c): CardLayout =>
-      c.id === id ? { ...c, size: c.size === "wide" ? "regular" : "wide" } : c,
-    );
-    set({ layout });
-    void putLayout({ cards: layout });
   },
 }));

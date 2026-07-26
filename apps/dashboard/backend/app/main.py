@@ -13,17 +13,26 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from . import settings
 from .config import build_effective_thresholds, load_config
+from .insights import insight_loop
 from .providers.sim import SimProvider
-from .routes import load_threshold_overrides, router
+from .providers.weather import OutdoorCache, build_outdoor_provider
+from .routes import load_settings, load_threshold_overrides, router
 from .stream import hub
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     hub.bind_loop()
-    task = asyncio.create_task(app.state.provider.run())
+    tasks = [
+        asyncio.create_task(app.state.provider.run()),
+        # Insights are derived from a 24h history read — expensive next to a
+        # state push, and far slower-moving than one. A 5-minute recompute is
+        # already more often than the conclusions change.
+        asyncio.create_task(insight_loop(app)),
+    ]
     yield
-    task.cancel()
+    for task in tasks:
+        task.cancel()
 
 
 def create_app() -> FastAPI:
@@ -50,6 +59,9 @@ def create_app() -> FastAPI:
     app.state.config = config
     app.state.default_thresholds = default_thresholds
     app.state.provider = provider
+    app.state.settings = load_settings()
+    app.state.outdoor_cache = OutdoorCache(provider=build_outdoor_provider())
+    app.state.insights = []
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],  # vite dev

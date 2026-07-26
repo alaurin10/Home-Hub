@@ -5,10 +5,11 @@
 :root {
   --page: #f9f9f7;
   --surface: #fcfcfb;
-  --surface-2: #f4f3f0;
+  /* a touch more separation than #f4f3f0 for the new track/row fills */
+  --surface-2: #f1f0ec;
   --ink: #0b0b0b;
   --ink-2: #52514e;
-  --muted: #898781;
+  --muted: #8b8983; /* ~4.6:1 on both grounds at 11–12px */
   --hairline: #e1e0d9;
   --baseline: #c3c2b7;
   --ring: rgba(11, 11, 11, 0.1);
@@ -27,17 +28,21 @@
   :root {
     --page: #0d0d0d;
     --surface: #1a1a19;
-    --surface-2: #232322;
+    --surface-2: #252524;
     --ink: #ffffff;
     --ink-2: #c3c2b7;
-    --muted: #898781;
+    --muted: #8b8983;
     --hairline: #2c2c2a;
-    --baseline: #383835;
+    --baseline: #3d3d39; /* ticks were disappearing on the dark ground */
     --ring: rgba(255, 255, 255, 0.1);
 
+    /* the light-mode green/red are too dark on #0d0d0d */
+    --status-good: #2eb82e;
+    --status-bad: #e04b4b;
+
     --series-1: #3987e5;
-    --series-2: #199e70;
-    --series-3: #c98500;
+    --series-2: #22b57f; /* legibility as a 2px stroke */
+    --series-3: #d99400;
   }
 }
 
@@ -49,11 +54,28 @@
   --color-ink-2: var(--ink-2);
   --color-muted: var(--muted);
   --color-hairline: var(--hairline);
+  --color-baseline: var(--baseline);
   --color-good: var(--status-good);
   --color-fair: var(--status-fair);
   --color-poor: var(--status-poor);
   --color-bad: var(--status-bad);
   --font-sans: system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+/* Every figure is tabular; prose is not. Applied per element rather than
+   globally so headings and body copy keep their proportional figures. */
+.tnum {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Horizontal metric-pill rails on mobile: the user wants swipe, not wrap. */
+.no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  width: 0;
+  height: 0;
 }
 
 /* Ambient color field — Liquid Glass needs something soft to refract.
@@ -69,10 +91,9 @@ html {
 body {
   min-height: 100vh;
   background:
-    radial-gradient(ellipse 60% 50% at 10% -8%, color-mix(in srgb, #2a78d6 32%, transparent), transparent 68%),
-    radial-gradient(ellipse 55% 48% at 95% 6%, color-mix(in srgb, #1baf7a 24%, transparent), transparent 68%),
-    radial-gradient(ellipse 70% 55% at 45% 112%, color-mix(in srgb, #eda100 20%, transparent), transparent 70%),
-    radial-gradient(ellipse 45% 40% at 70% 55%, color-mix(in srgb, #4a3aa7 12%, transparent), transparent 70%),
+    radial-gradient(ellipse 62% 50% at 8% -10%, color-mix(in srgb, #2a78d6 26%, transparent), transparent 66%),
+    radial-gradient(ellipse 52% 46% at 96% 4%, color-mix(in srgb, #1baf7a 20%, transparent), transparent 66%),
+    radial-gradient(ellipse 72% 55% at 42% 114%, color-mix(in srgb, #eda100 17%, transparent), transparent 70%),
     var(--page);
   background-attachment: fixed;
 }
@@ -80,10 +101,9 @@ body {
 @media (prefers-color-scheme: dark) {
   body {
     background:
-      radial-gradient(ellipse 60% 52% at 10% -8%, color-mix(in srgb, #3987e5 38%, transparent), transparent 68%),
-      radial-gradient(ellipse 55% 48% at 95% 6%, color-mix(in srgb, #199e70 26%, transparent), transparent 68%),
-      radial-gradient(ellipse 70% 58% at 45% 115%, color-mix(in srgb, #9085e9 24%, transparent), transparent 70%),
-      radial-gradient(ellipse 45% 42% at 70% 55%, color-mix(in srgb, #d55181 10%, transparent), transparent 70%),
+      radial-gradient(ellipse 62% 52% at 8% -10%, color-mix(in srgb, #3987e5 34%, transparent), transparent 66%),
+      radial-gradient(ellipse 52% 46% at 96% 4%, color-mix(in srgb, #199e70 24%, transparent), transparent 66%),
+      radial-gradient(ellipse 72% 58% at 42% 116%, color-mix(in srgb, #9085e9 22%, transparent), transparent 70%),
       var(--page);
     background-attachment: fixed;
   }
@@ -103,21 +123,21 @@ body {
 }
 
 .glass {
-  background: color-mix(in srgb, var(--surface) 52%, transparent);
+  background: var(--glass-bg);
   -webkit-backdrop-filter: blur(20px) saturate(170%);
   backdrop-filter: blur(20px) saturate(170%);
   border: none;
-  box-shadow: 0 12px 32px -16px rgba(0, 0, 0, 0.25);
+  box-shadow: var(--glass-shadow);
   /* 0.3s keeps the hover shadow in step with the card's hover spring (~300ms) */
   transition: box-shadow 0.3s ease, background-color 0.3s ease;
 }
 
 .glass-chrome {
-  background: color-mix(in srgb, var(--surface) 48%, transparent);
+  background: var(--chrome-bg);
   -webkit-backdrop-filter: blur(28px) saturate(185%);
   backdrop-filter: blur(28px) saturate(185%);
   border: none;
-  box-shadow: 0 6px 18px -10px rgba(0, 0, 0, 0.25);
+  box-shadow: var(--chrome-shadow);
 }
 
 /* the bezel ring */
@@ -161,6 +181,10 @@ body {
   --glass-edge-low: rgba(255, 255, 255, 0.35);
   --glass-specular: rgba(255, 255, 255, 0.95);
   --glass-sheen: rgba(255, 255, 255, 0.28);
+  --glass-bg: color-mix(in srgb, var(--surface) 56%, transparent);
+  --glass-shadow: 0 12px 32px -16px rgba(0, 0, 0, 0.22);
+  --chrome-bg: color-mix(in srgb, var(--surface) 50%, transparent);
+  --chrome-shadow: 0 6px 18px -10px rgba(0, 0, 0, 0.24);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -169,16 +193,13 @@ body {
     --glass-edge-low: rgba(255, 255, 255, 0.04);
     --glass-specular: rgba(255, 255, 255, 0.28);
     --glass-sheen: rgba(255, 255, 255, 0.05);
-  }
-  .glass {
-    background: color-mix(in srgb, var(--surface) 48%, transparent);
-    box-shadow: 0 14px 36px -16px rgba(0, 0, 0, 0.55);
+    --glass-bg: color-mix(in srgb, var(--surface) 52%, transparent);
+    --glass-shadow: 0 14px 36px -16px rgba(0, 0, 0, 0.55);
+    --chrome-bg: color-mix(in srgb, var(--surface) 46%, transparent);
+    --chrome-shadow: 0 8px 22px -12px rgba(0, 0, 0, 0.6);
   }
   .glass:hover {
     box-shadow: 0 20px 48px -18px rgba(0, 0, 0, 0.65);
-  }
-  .glass-chrome {
-    background: color-mix(in srgb, var(--surface) 44%, transparent);
   }
 }
 

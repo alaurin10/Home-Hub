@@ -75,3 +75,17 @@ thresholds:
   pm10: {bounds: [45, 100, 150], unit: "µg/m³"}
   voc: {bounds: [150, 250, 400], unit: ""}
   nox: {bounds: [20, 150, 300], unit: ""}
+
+# Air score. A room starts at 100 and loses "distance past its comfortable band
+# x a weight" for every reading. Nothing is capped per metric — one very bad
+# reading can carry the score down on its own, which is the point: the score
+# answers "should I do something", it is not an average of virtues.
+#
+# Temperature and humidity have no target here: they score against the `good`
+# window in `thresholds` above (and so follow the Settings dialog live).
+# This whole block is optional — delete it and the defaults below apply.
+score:
+  targets: {co2: 800, pm2_5: 12, voc: 150}          # units as in thresholds
+  weights: {co2: 0.05, pm2_5: 0.7, voc: 0.1, temperature: 2.0, humidity: 1.1}
+  bands: {excellent: 90, good: 75, fair: 55}        # below fair = poor
+  house: {worst_weight: 0.55}                       # rest goes to the room mean

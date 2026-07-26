@@ -1,317 +1,377 @@
-import { motion } from "framer-motion";
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { ArrowLeft } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Link, useNavigate, useParams } from "react-router-dom";
 
 import { getHistory } from "../api/client";
-import type { HistoryResponse } from "../api/types";
-import { LegendRow, TrendChart, type Series } from "../components/charts/TrendChart";
-import { Gauge } from "../components/Gauge";
-import { NumberTicker } from "../components/NumberTicker";
+import type { HistoryPoint, HistoryResponse, RoomSnapshot } from "../api/types";
+import { Page } from "../App";
 import { PageTransition } from "../components/PageTransition";
+import { RangeControl } from "../components/RangeControl";
 import { Skeleton } from "../components/Skeleton";
-import { StatTile } from "../components/StatTile";
-import { StatusChip } from "../components/StatusChip";
-import { METRIC_LABEL, roomStatus, statusFor, STATUS_COLOR, type Status } from "../lib/thresholds";
+import { Sparkline } from "../components/charts/Sparkline";
+import { TrendChart, type Series } from "../components/charts/TrendChart";
+import { formatValue, humanDuration } from "../lib/format";
+import { RANGES, rangeCaption } from "../lib/ranges";
+import { displayTemp, isTemperatureMetric, scaleOf, tempUnit } from "../lib/scale";
+import {
+  METRIC_DIGITS,
+  METRIC_LABEL,
+  METRIC_SHORT,
+  SCORE_BAND_COLOR,
+  SCORE_BAND_LABEL,
+  STATUS_COLOR,
+  STATUS_LABEL,
+  statusFor,
+  tint,
+  trackPercent,
+  unitFor,
+  type Status,
+} from "../lib/thresholds";
+import { useIsDesktop } from "../lib/useBreakpoint";
 import { useStore } from "../store";
 
-// Raw ranges (≤48h) carry a point budget sized to the window so bucket
-// width stays useful (48h at the default 288 was 10-minute buckets; 576
-// halves that). Stats ranges (>48h) are hourly server-side; points unused.
-const RANGES: { label: string; hours: number; points?: number }[] = [
-  { label: "3h", hours: 3, points: 240 },
-  { label: "24h", hours: 24, points: 288 },
-  { label: "48h", hours: 48, points: 576 },
-  { label: "7d", hours: 24 * 7 },
-  { label: "30d", hours: 24 * 30 },
-  { label: "90d", hours: 24 * 90 },
-];
-
-// Fixed categorical slots per entity role — never cycled, never re-ranked.
-const PM_COLORS = { pm1_0: "var(--series-1)", pm2_5: "var(--series-2)", pm10: "var(--series-3)" };
-
-/** One filter row above the charts; the active pill slides on a spring.
- * The pill is a single measured element (offsetLeft/offsetWidth of the
- * active button) rather than a layoutId pair: a layoutId element inside a
- * route stalls AnimatePresence mode="wait" exits — the view finishes fading
- * but never unmounts, leaving a dead page after Back. */
-function RangeSelector({ hours, onChange }: { hours: number; onChange: (h: number) => void }) {
-  const listRef = useRef<HTMLDivElement>(null);
-  const [pill, setPill] = useState<{ x: number; w: number } | null>(null);
-
-  useLayoutEffect(() => {
-    const el = listRef.current?.querySelector<HTMLElement>(`[data-hours='${hours}']`);
-    if (el) setPill({ x: el.offsetLeft, w: el.offsetWidth });
-  }, [hours]);
-
-  return (
-    <div ref={listRef} className="glass-chrome relative mb-4 flex w-fit items-center gap-1 rounded-full p-1">
-      {pill && (
-        <motion.span
-          aria-hidden
-          className="absolute bottom-1 top-1 left-0 rounded-full bg-ink"
-          initial={false}
-          animate={{ x: pill.x, width: pill.w }}
-          transition={{ type: "spring", stiffness: 420, damping: 34 }}
-        />
-      )}
-      {RANGES.map((r) => (
-        <button
-          key={r.label}
-          data-hours={r.hours}
-          onClick={() => onChange(r.hours)}
-          className="relative rounded-full px-3 py-1 text-xs font-medium"
-        >
-          <span
-            className={`relative transition-colors duration-200 ${
-              hours === r.hours ? "text-surface" : "text-muted hover:text-ink-2"
-            }`}
-          >
-            {r.label}
-          </span>
-        </button>
-      ))}
-    </div>
-  );
-}
-
-/** Compact status marker for section headers (paired with the value beside it). */
-function StatusDot({ status }: { status: Status | null }) {
-  if (!status) return null;
-  return (
-    <span aria-hidden className="h-1.5 w-1.5 rounded-full" style={{ background: STATUS_COLOR[status] }} />
-  );
-}
+const BAND_ORDER: Status[] = ["good", "fair", "poor", "bad"];
 
 export function RoomView() {
   const { id } = useParams();
-  const { config, rooms } = useStore();
-  const [hours, setHours] = useState(24);
-  // Loaded history is tagged with the room/range it belongs to: on a range
-  // switch the previous charts stay mounted (no collapse/re-open bounce) and
-  // simply swap data when the fetch lands. Only a room change starts blank.
-  const [loaded, setLoaded] = useState<{ roomId: string; hours: number; resp: HistoryResponse } | null>(
-    null,
-  );
+  const navigate = useNavigate();
+  const { config, rooms, settings, rangeIdx } = useStore();
+  const isDesktop = useIsDesktop();
+  const [metric, setMetric] = useState("co2");
+  const [loaded, setLoaded] = useState<{
+    roomId: string;
+    rangeIdx: number;
+    resp: HistoryResponse;
+  } | null>(null);
   const [failed, setFailed] = useState(false);
   const [retryKey, setRetryKey] = useState(0);
 
   const roomCfg = config?.rooms.find((r) => r.id === id);
   const room = rooms?.rooms.find((r) => r.id === id);
 
+  // A new room resets the plotted metric: CO₂ is the reading that decides
+  // "open a window", so it is the one worth landing on.
+  useEffect(() => setMetric("co2"), [id]);
+
   useEffect(() => {
     if (!roomCfg) return;
     let alive = true;
     setFailed(false);
-    const entities = Object.values(roomCfg.entities);
-    const points = RANGES.find((r) => r.hours === hours)?.points;
-    getHistory(entities, hours, points)
-      .then((resp) => alive && setLoaded({ roomId: roomCfg.id, hours, resp }))
+    const range = RANGES[rangeIdx];
+    getHistory(Object.values(roomCfg.entities), range.hours, range.points)
+      .then((resp) => alive && setLoaded({ roomId: roomCfg.id, rangeIdx, resp }))
       .catch(() => alive && setFailed(true));
     return () => {
       alive = false;
     };
-  }, [roomCfg, hours, retryKey]);
-
-  const history = loaded && loaded.roomId === roomCfg?.id ? loaded.resp : null;
-  // Label/format charts by the range actually plotted, not the pending one.
-  const plottedHours = history ? loaded!.hours : hours;
-
-  const seriesFor = useMemo(
-    () =>
-      (metric: string, color: string): Series | null => {
-        if (!roomCfg || !history) return null;
-        const entity = roomCfg.entities[metric];
-        const points = history.series[entity];
-        if (!points?.length) return null;
-        return { name: METRIC_LABEL[metric] ?? metric, points, color };
-      },
-    [roomCfg, history],
-  );
+  }, [roomCfg, rangeIdx, retryKey]);
 
   if (!config || !rooms)
     return (
-      <main className="mx-auto max-w-5xl px-5 pb-24 pt-4 md:pb-10">
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <Skeleton className="h-64" />
-          <Skeleton className="h-64" />
-        </div>
-        <Skeleton className="mt-4 h-72" />
-      </main>
+      <Page>
+        <Skeleton className="h-16" />
+        <Skeleton className="h-96" />
+      </Page>
     );
   if (!room || !roomCfg)
     return (
-      <main className="mx-auto max-w-5xl px-5 pb-24 pt-4 md:pb-10">
+      <Page>
         <div className="glass rounded-3xl p-8 text-center">
           <p className="text-sm text-ink-2">Room not found.</p>
-          <Link to="/" className="glass-chrome mt-4 inline-block rounded-full px-4 py-1.5 text-sm font-medium text-ink-2">
+          <Link
+            to="/"
+            className="glass-chrome mt-4 inline-block rounded-full px-4 py-1.5 text-sm font-medium text-ink-2"
+          >
             Back to home
           </Link>
         </div>
-      </main>
+      </Page>
     );
 
+  const scale = scaleOf(settings);
+  const history = loaded && loaded.roomId === roomCfg.id ? loaded.resp : null;
+  const plottedHours = history ? RANGES[loaded!.rangeIdx].hours : RANGES[rangeIdx].hours;
   const kind = history?.kind ?? "raw";
-  const co2 = seriesFor("co2", "var(--series-1)");
-  const temp = seriesFor("temperature", "var(--series-1)");
-  const rh = seriesFor("humidity", "var(--series-2)");
-  const pmSeries = (["pm1_0", "pm2_5", "pm10"] as const)
-    .map((m) => seriesFor(m, PM_COLORS[m]))
-    .filter((s): s is Series => s !== null);
-  const voc = seriesFor("voc", "var(--series-1)");
-  const nox = seriesFor("nox", "var(--series-2)");
+  const metrics = Object.keys(roomCfg.entities);
 
-  const dew = room.metrics.dew_point;
-  const abs = room.metrics.absolute_humidity;
+  const pointsFor = (m: string): HistoryPoint[] | null => {
+    const raw = history?.series[roomCfg.entities[m]];
+    if (!raw?.length) return null;
+    if (!isTemperatureMetric(m) || scale === "F") return raw;
+    return raw.map((p) => ({
+      ...p,
+      v: p.v === null || p.v === undefined ? p.v : displayTemp(p.v, scale),
+      mean: p.mean === null || p.mean === undefined ? p.mean : displayTemp(p.mean, scale),
+    }));
+  };
+
+  const value = room.metrics[metric]?.value ?? null;
+  const status = statusFor(config, metric, value);
+  const unit = isTemperatureMetric(metric) ? tempUnit(scale) : unitFor(config, metric);
+  const digits = METRIC_DIGITS[metric] ?? 0;
+  const points = pointsFor(metric);
+  const series: Series[] = points
+    ? [
+        {
+          name: METRIC_LABEL[metric] ?? metric,
+          points,
+          color: status ? STATUS_COLOR[status] : "var(--series-1)",
+        },
+      ]
+    : [];
+
+  // How much of the plotted window each status band held. Counted from the
+  // samples actually on screen, so it always agrees with the chart above it.
+  const occupancy = (() => {
+    if (!points) return [];
+    const counts: Record<string, number> = {};
+    let total = 0;
+    for (const p of points) {
+      const v = (kind === "raw" ? p.v : p.mean) ?? null;
+      // Bands are defined in °F, so classify before the display conversion.
+      const source = isTemperatureMetric(metric) && scale === "C" && v !== null ? (v * 9) / 5 + 32 : v;
+      const s = statusFor(config, metric, source);
+      if (!s) continue;
+      counts[s] = (counts[s] ?? 0) + 1;
+      total += 1;
+    }
+    if (!total) return [];
+    return BAND_ORDER.filter((b) => counts[b]).map((b) => ({
+      band: b,
+      percent: Math.round((counts[b] / total) * 100),
+    }));
+  })();
+
+  const smallMultiples = metrics.filter((m) => m !== metric).slice(0, 3);
 
   return (
-    <main className="mx-auto max-w-5xl px-5 pb-24 pt-4 md:pb-10">
+    <Page>
       <PageTransition>
-        <div className="mb-4 flex items-center justify-between">
+        <div className="flex flex-col gap-5 max-lg:gap-3.5">
           <div className="flex items-center gap-3">
-            <Link
-              to="/"
-              className="glass-chrome flex h-9 w-9 items-center justify-center rounded-full text-ink-2 transition-colors hover:text-ink"
-              aria-label="Back to home"
-            >
-              ←
-            </Link>
-            <h1 className="text-xl font-semibold tracking-tight text-ink">{room.name}</h1>
-            <StatusChip status={roomStatus(config, room)} />
-          </div>
-          {!room.node.online && (
-            <span className="text-sm font-medium" style={{ color: "var(--status-bad)" }}>
-              ⚠ Sensor offline
-            </span>
-          )}
-        </div>
-
-        <RangeSelector hours={hours} onChange={setHours} />
-
-        {failed && (
-          <div className="glass mb-4 flex items-center justify-between rounded-3xl p-4" role="alert">
-            <p className="text-sm text-ink-2">
-              <span aria-hidden>⚠ </span>Couldn't load history for this range.
-            </p>
             <button
-              onClick={() => setRetryKey((k) => k + 1)}
-              className="glass-chrome rounded-full px-3 py-1 text-xs font-medium text-ink-2"
+              onClick={() => navigate("/")}
+              aria-label="Back to home"
+              className="glass-chrome flex h-9 w-9 flex-none items-center justify-center rounded-full text-ink-2 max-lg:h-[34px] max-lg:w-[34px]"
             >
-              Retry
+              <ArrowLeft size={16} strokeWidth={2} />
             </button>
-          </div>
-        )}
-
-        {/* Comfort first: temperature + humidity lead, matching the cards. */}
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <section className="glass rounded-3xl p-5">
-            <header className="mb-2 flex items-baseline justify-between">
-              <h2 className="text-sm font-semibold text-ink">Temperature</h2>
-              <div className="flex items-center gap-2 text-sm text-ink-2">
-                <StatusDot status={statusFor(config, "temperature", room.metrics.temperature?.value ?? null)} />
-                <span>
-                  <span className="text-xl font-semibold text-ink">
-                    <NumberTicker value={room.metrics.temperature?.value ?? null} digits={1} />
-                  </span>{" "}
-                  °F now
-                </span>
-              </div>
-            </header>
-            <TrendChart
-              series={temp ? [temp] : []}
-              kind={kind}
-              hours={plottedHours}
-              height={200}
-              unit="°F"
-            />
-          </section>
-          <section className="glass rounded-3xl p-5">
-            <header className="mb-2 flex items-baseline justify-between">
-              <h2 className="text-sm font-semibold text-ink">Humidity</h2>
-              <div className="flex items-center gap-2 text-sm text-ink-2">
-                <StatusDot status={statusFor(config, "humidity", room.metrics.humidity?.value ?? null)} />
-                <span>
-                  <span className="text-xl font-semibold text-ink">
-                    <NumberTicker value={room.metrics.humidity?.value ?? null} digits={0} />
-                  </span>{" "}
-                  % now
-                </span>
-              </div>
-            </header>
-            <TrendChart series={rh ? [rh] : []} kind={kind} hours={plottedHours} height={200} unit="%" />
-          </section>
-        </div>
-
-        {/* CO₂ directly after the comfort pair: the reading that decides
-            "open a window" shouldn't hide below derived tiles. */}
-        <section className="mt-4 glass rounded-3xl p-5">
-          <header className="mb-2 flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-ink">CO₂</h2>
-            <div className="flex items-center gap-3">
-              <StatusChip status={statusFor(config, "co2", room.metrics.co2?.value ?? null)} />
-              <Gauge
-                value={room.metrics.co2?.value ?? null}
-                bounds={config.thresholds.co2.bounds ?? []}
-                size={72}
-                status={statusFor(config, "co2", room.metrics.co2?.value ?? null)}
+            <h1 className="text-[22px] font-semibold tracking-[-.02em] text-ink lg:hidden">
+              {room.name}
+            </h1>
+            {room.score ? (
+              <span
+                className="inline-flex items-center gap-[7px] rounded-full px-3 py-[5px] text-[12.5px] font-semibold text-ink-2"
+                style={{ background: tint(SCORE_BAND_COLOR[room.score.band]) }}
               >
-                <span className="text-base font-semibold leading-none text-ink">
-                  <NumberTicker value={room.metrics.co2?.value ?? null} />
-                </span>
-                <span className="mt-0.5 text-[9px] font-medium text-muted">ppm</span>
-              </Gauge>
+                <span
+                  aria-hidden
+                  className="h-[7px] w-[7px] rounded-full"
+                  style={{ background: SCORE_BAND_COLOR[room.score.band] }}
+                />
+                {SCORE_BAND_LABEL[room.score.band]} · score {room.score.value}
+              </span>
+            ) : (
+              <span className="text-[12.5px] font-medium" style={{ color: "var(--status-bad)" }}>
+                Sensor offline
+              </span>
+            )}
+            <span className="text-[12.5px] text-muted max-lg:hidden">{nodeLine(room)}</span>
+          </div>
+
+          {/* Mobile: one horizontally scrollable rail of metric pills. Swipe,
+              never wrap — a wrapped rail pushes the chart below the fold. */}
+          <div className="no-scrollbar flex gap-[7px] overflow-x-auto pb-0.5 lg:hidden">
+            {metrics.map((m) => (
+              <button
+                key={m}
+                onClick={() => setMetric(m)}
+                className={`flex-none rounded-full px-3.5 py-2 text-[12.5px] font-medium transition-colors ${
+                  m === metric ? "bg-ink text-surface" : "glass-chrome text-ink-2"
+                }`}
+              >
+                {METRIC_SHORT[m] ?? m}
+              </button>
+            ))}
+          </div>
+
+          {failed && (
+            <div className="glass flex items-center justify-between rounded-3xl p-4" role="alert">
+              <p className="text-sm text-ink-2">Couldn't load history for this range.</p>
+              <button
+                onClick={() => setRetryKey((k) => k + 1)}
+                className="glass-chrome rounded-full px-3 py-1 text-xs font-medium text-ink-2"
+              >
+                Retry
+              </button>
             </div>
-          </header>
-          <TrendChart
-            series={co2 ? [co2] : []}
-            kind={kind}
-            hours={plottedHours}
-            height={240}
-            unit="ppm"
-            guides={(config.thresholds.co2.bounds ?? []).slice(0, 2)}
-          />
-        </section>
+          )}
 
-        <div className="mt-4 grid grid-cols-2 gap-4">
-          <StatTile
-            label="Dew point"
-            value={dew?.value ?? null}
-            unit="°F"
-            // 60.8°F = 16°C, the muggy threshold
-            note={dew?.value !== null && dew !== undefined && dew.value! > 60.8 ? "muggy" : "comfortable"}
-          />
-          <StatTile label="Absolute humidity" value={abs?.value ?? null} unit="g/m³" />
+          <div className="grid min-w-0 gap-5 max-lg:gap-3.5 lg:grid-cols-[minmax(0,1fr)_320px]">
+            <section className="glass min-w-0 rounded-[26px] p-[24px_26px_18px] max-lg:rounded-[24px] max-lg:p-[18px_18px_12px]">
+              <div className="flex flex-wrap items-start justify-between gap-5">
+                <div>
+                  <h2 className="text-[16.5px] font-semibold tracking-[-.01em] text-ink max-lg:text-[11px] max-lg:font-semibold max-lg:uppercase max-lg:tracking-[.08em] max-lg:text-muted">
+                    {METRIC_LABEL[metric] ?? metric}
+                  </h2>
+                  <div className="mt-1 text-[12.5px] text-muted max-lg:hidden">
+                    {rangeCaption(RANGES[rangeIdx])}
+                  </div>
+                </div>
+                <div className="flex items-baseline gap-1.5">
+                  <span className="tnum text-[34px] font-semibold tracking-[-.03em] text-ink">
+                    {formatValue(
+                      value !== null && isTemperatureMetric(metric)
+                        ? displayTemp(value, scale)
+                        : value,
+                      digits,
+                    )}
+                  </span>
+                  <span className="text-sm text-muted">{unit} now</span>
+                </div>
+              </div>
+              <RangeControl />
+              {series.length ? (
+                <TrendChart
+                  series={series}
+                  kind={kind}
+                  hours={plottedHours}
+                  height={isDesktop ? 470 : 210}
+                  unit={unit}
+                  guides={config.thresholds[metric]?.bounds?.slice(0, 2) ?? []}
+                />
+              ) : (
+                <Skeleton className="my-2 h-[470px] max-lg:h-[210px]" />
+              )}
+            </section>
+
+            <section className="glass rounded-[26px] p-[22px_24px] max-lg:rounded-[24px] max-lg:p-[18px_20px]">
+              <h2 className="text-[13px] font-semibold uppercase tracking-[.04em] text-muted max-lg:text-[11px] max-lg:tracking-[.08em]">
+                All readings
+              </h2>
+              <div className="mt-3 flex flex-col gap-0.5">
+                {metrics.map((m) => {
+                  const mv = room.metrics[m]?.value ?? null;
+                  const s = statusFor(config, m, mv);
+                  const active = m === metric;
+                  const shown =
+                    mv !== null && isTemperatureMetric(m) ? displayTemp(mv, scale) : mv;
+                  return (
+                    <button
+                      key={m}
+                      onClick={() => setMetric(m)}
+                      className={`block w-full rounded-xl p-[10px_12px] text-left transition-colors hover:bg-surface-2 ${
+                        active ? "bg-surface-2" : ""
+                      }`}
+                    >
+                      <div className="flex items-baseline justify-between gap-2.5">
+                        <span className="inline-flex items-center gap-[7px] text-[13px] text-ink-2">
+                          {METRIC_LABEL[m] ?? m}
+                          {active && (
+                            <span className="text-[10px] font-semibold uppercase tracking-[.06em] text-muted">
+                              plotted
+                            </span>
+                          )}
+                        </span>
+                        <span className="tnum text-[15px] font-semibold text-ink">
+                          {formatValue(shown, METRIC_DIGITS[m] ?? 0)}
+                          <span className="ml-[3px] text-[11.5px] font-normal text-muted">
+                            {isTemperatureMetric(m) ? tempUnit(scale) : unitFor(config, m)}
+                          </span>
+                        </span>
+                      </div>
+                      <div className="mt-[7px] h-1 rounded-full bg-surface-2">
+                        <div
+                          className="h-full rounded-full"
+                          style={{
+                            width: `${trackPercent(m, mv)}%`,
+                            background: s ? STATUS_COLOR[s] : "var(--muted)",
+                          }}
+                        />
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {occupancy.length > 0 && (
+                <div className="mt-5 border-t border-hairline pt-4">
+                  <div className="flex items-baseline justify-between">
+                    <span className="text-[11px] font-semibold uppercase tracking-[.07em] text-muted">
+                      Time in band
+                    </span>
+                    <span className="text-[11.5px] text-muted">{METRIC_LABEL[metric]}</span>
+                  </div>
+                  <div className="mt-2.5 flex h-[9px] overflow-hidden rounded-full bg-surface-2">
+                    {occupancy.map((o) => (
+                      <span
+                        key={o.band}
+                        style={{ width: `${o.percent}%`, background: STATUS_COLOR[o.band] }}
+                      />
+                    ))}
+                  </div>
+                  <div className="mt-3 flex flex-col gap-[7px]">
+                    {occupancy.map((o) => (
+                      <div key={o.band} className="flex items-center gap-2 text-[12.5px] text-ink-2">
+                        <span
+                          aria-hidden
+                          className="h-[7px] w-[7px] rounded-full"
+                          style={{ background: STATUS_COLOR[o.band] }}
+                        />
+                        {STATUS_LABEL[o.band]}
+                        <span className="tnum ml-auto text-muted">{o.percent}%</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </section>
+          </div>
+
+          <div className="grid gap-5 max-lg:hidden lg:grid-cols-3">
+            {smallMultiples.map((m) => {
+              const mv = room.metrics[m]?.value ?? null;
+              const s = statusFor(config, m, mv);
+              const shown = mv !== null && isTemperatureMetric(m) ? displayTemp(mv, scale) : mv;
+              return (
+                <button
+                  key={m}
+                  onClick={() => setMetric(m)}
+                  className="glass rounded-[22px] p-[18px_20px_14px] text-left transition-transform hover:-translate-y-0.5"
+                >
+                  <div className="flex items-baseline justify-between">
+                    <span className="text-[12.5px] font-semibold text-ink-2">
+                      {METRIC_LABEL[m] ?? m}
+                    </span>
+                    <span className="tnum text-base font-semibold text-ink">
+                      {formatValue(shown, METRIC_DIGITS[m] ?? 0)}
+                      <span className="ml-0.5 text-[11px] font-normal text-muted">
+                        {isTemperatureMetric(m) ? tempUnit(scale) : unitFor(config, m)}
+                      </span>
+                    </span>
+                  </div>
+                  <div className="mt-2.5">
+                    <Sparkline
+                      points={pointsFor(m)}
+                      width={481}
+                      height={96}
+                      color={s ? STATUS_COLOR[s] : "var(--baseline)"}
+                      stretch
+                    />
+                  </div>
+                </button>
+              );
+            })}
+          </div>
         </div>
-
-        {pmSeries.length > 0 && (
-          <section className="mt-4 glass rounded-3xl p-5">
-            <header className="mb-2 flex flex-wrap items-center justify-between gap-2">
-              <h2 className="text-sm font-semibold text-ink">Particulate matter</h2>
-              <LegendRow items={pmSeries.map((s) => ({ name: s.name, color: s.color }))} />
-            </header>
-            <TrendChart series={pmSeries} kind={kind} hours={plottedHours} height={200} unit="µg/m³" area={false} />
-          </section>
-        )}
-
-        {(voc || nox) && (
-          <section className="mt-4 glass rounded-3xl p-5">
-            <header className="mb-2 flex flex-wrap items-center justify-between gap-2">
-              <h2 className="text-sm font-semibold text-ink">Gas indices</h2>
-              <LegendRow
-                items={[voc, nox]
-                  .filter((s): s is Series => s !== null)
-                  .map((s) => ({ name: s.name, color: s.color }))}
-              />
-            </header>
-            <TrendChart
-              series={[voc, nox].filter((s): s is Series => s !== null)}
-              kind={kind}
-              hours={plottedHours}
-              height={180}
-              area={false}
-            />
-          </section>
-        )}
       </PageTransition>
-    </main>
+    </Page>
   );
+}
+
+function nodeLine(room: RoomSnapshot): string {
+  const parts = [room.node.online ? "node online" : "node offline"];
+  if (room.node.wifi_signal !== null) parts.push(`${formatValue(room.node.wifi_signal)} dBm`);
+  if (room.node.uptime !== null) parts.push(`up ${humanDuration(room.node.uptime)}`);
+  return parts.join(" · ");
 }
