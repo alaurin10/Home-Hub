@@ -69,7 +69,12 @@ fleet:
 thresholds:
   temperature: {ranges: {good: [67, 75], fair: [64, 78], poor: [60, 82]}, unit: "°F"}
   humidity: {ranges: {good: [35, 55], fair: [30, 60], poor: [25, 65]}, unit: "%"}
-  co2: {bounds: [800, 1200, 2000], unit: ppm}
+  # CO₂ bands follow the standard indoor-air reading of ppm:
+  #   <800        well-ventilated
+  #   800–1,000   acceptable for an occupied room
+  #   1,000–2,000 stuffy — mild sleepiness, reduced focus
+  #   >2,000      poor ventilation — headaches and fatigue
+  co2: {bounds: [800, 1000, 2000], unit: ppm}
   pm2_5: {bounds: [12, 35, 55], unit: "µg/m³"}
   pm1_0: {bounds: [12, 35, 55], unit: "µg/m³"}
   pm10: {bounds: [45, 100, 150], unit: "µg/m³"}
