@@ -16,6 +16,7 @@ import json
 import time
 from datetime import datetime, timezone
 from typing import Callable
+from urllib.parse import quote
 
 import httpx
 import websockets
@@ -76,10 +77,19 @@ class HAProvider:
     async def _recent_history(
         self, entity_ids: list[str], hours: float, points: int
     ) -> dict[str, list[dict]]:
-        start = datetime.fromtimestamp(time.time() - hours * 3600, tz=timezone.utc)
+        now = time.time()
+        start = datetime.fromtimestamp(now - hours * 3600, tz=timezone.utc)
+        end = datetime.fromtimestamp(now, tz=timezone.utc)
+        # end_time is only optional in the sense that HA supplies a default, and
+        # that default is start + 1 day — which silently truncates any window
+        # longer than 24h. Left off, the 48h range came back covering -48h to
+        # -24h and the chart ended on the previous day. quote() because the
+        # "+00:00" offset would otherwise decode to a space in a query string.
         url = (
             f"{self.base_url}/api/history/period/{start.isoformat()}"
-            f"?filter_entity_id={','.join(entity_ids)}&minimal_response&no_attributes"
+            f"?filter_entity_id={','.join(entity_ids)}"
+            f"&end_time={quote(end.isoformat())}"
+            f"&minimal_response&no_attributes"
         )
         async with httpx.AsyncClient(headers=self._headers, timeout=30) as client:
             resp = await client.get(url)
