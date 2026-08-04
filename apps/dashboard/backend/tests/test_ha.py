@@ -2,7 +2,10 @@
 first row per entity carries last_updated; later rows carry last_changed)."""
 
 import asyncio
+import time
+from datetime import datetime
 from pathlib import Path
+from urllib.parse import parse_qs, unquote, urlparse
 
 import httpx
 
@@ -47,6 +50,30 @@ def test_recent_history_uses_last_changed_fallback(monkeypatch):
     series = asyncio.run(provider._recent_history([entity], hours=3, points=100))
 
     assert [row["v"] for row in series[entity]] == [600.0, 610.0, 615.0]
+
+
+def test_recent_history_requests_window_up_to_now(monkeypatch):
+    # HA defaults end_time to start + 1 day, so a 48h request without an
+    # explicit end_time returns -48h to -24h and the chart stops a day short.
+    seen = {}
+
+    async def fake_get(self, url, *args, **kwargs):
+        seen["url"] = url
+        return _FakeResponse([])
+
+    monkeypatch.setattr(httpx.AsyncClient, "get", fake_get)
+
+    provider = HAProvider(CONFIG, base_url="http://ha.local:8123", token="x")
+    before = time.time()
+    asyncio.run(provider._recent_history(["sensor.bedroom_air_co2"], hours=48, points=576))
+    after = time.time()
+
+    parsed = urlparse(seen["url"])
+    start = datetime.fromisoformat(unquote(parsed.path.rsplit("/", 1)[1]))
+    end = datetime.fromisoformat(parse_qs(parsed.query)["end_time"][0])
+
+    assert before <= end.timestamp() <= after
+    assert (end - start).total_seconds() == 48 * 3600
 
 
 def test_downsample_respects_point_budget():
