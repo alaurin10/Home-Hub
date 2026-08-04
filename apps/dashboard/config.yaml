@@ -86,6 +86,19 @@ thresholds:
 # This whole block is optional — delete it and the defaults below apply.
 score:
   targets: {co2: 800, pm2_5: 12, voc: 150}          # units as in thresholds
-  weights: {co2: 0.05, pm2_5: 0.7, voc: 0.1, temperature: 2.0, humidity: 1.1}
+  weights:
+    # A weight is a flat rate per unit past the target, or [from, rate] tiers
+    # that steepen as the reading climbs. Tiers are progressive like tax
+    # brackets: each rate bites only on the part of the reading inside it, and
+    # the first tier must start at the metric's target.
+    #
+    # CO₂ is tiered because its bands are not evenly bad. 1,000 ppm is still an
+    # acceptable occupied room and barely dents the score; 2,000 is headaches
+    # and fatigue and guts it. One flat rate cannot do both.
+    co2: [[800, 0.015], [1000, 0.045], [2000, 0.10]]  # per ppm, by band
+    pm2_5: 0.7
+    voc: 0.1
+    temperature: 2.0
+    humidity: 1.1
   bands: {excellent: 90, good: 75, fair: 55}        # below fair = poor
   house: {worst_weight: 0.55}                       # rest goes to the room mean

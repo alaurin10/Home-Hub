@@ -19,7 +19,7 @@ export function BandBar({
   showScale = true,
 }: {
   value: number | null;
-  /** Threshold bounds from config, e.g. [800, 1200, 2000]. Only the ones inside
+  /** Threshold bounds from config, e.g. [800, 1000, 2000]. Only the ones inside
    * the plotted span get a tick. */
   bounds: number[];
   status: Status | null;
@@ -54,12 +54,26 @@ export function BandBar({
           />
         ))}
       </div>
+      {/* Scale labels are derived from the same bounds as the ticks and sit at
+          their true position, so a retuned band cannot leave the bar reading
+          one number and the scale another. */}
       {showScale && (
-        <div className="tnum mt-[7px] flex justify-between text-[11px] text-muted">
-          <span>400</span>
-          <span>800</span>
-          <span>1,200</span>
-          <span>2,000</span>
+        <div className="tnum relative mt-[7px] h-[13px] text-[11px] text-muted">
+          {[FLOOR, ...ticks, CEILING].map((v, i, all) => (
+            <span
+              key={v}
+              className="absolute top-0"
+              style={
+                i === 0
+                  ? { left: 0 }
+                  : i === all.length - 1
+                    ? { right: 0 }
+                    : { left: `${pct(v)}%`, transform: "translateX(-50%)" }
+              }
+            >
+              {v.toLocaleString("en-US")}
+            </span>
+          ))}
         </div>
       )}
     </div>
