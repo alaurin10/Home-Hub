@@ -19,8 +19,22 @@ from dataclasses import dataclass
 # metrics have no target here — they use the `good` window from thresholds, so
 # retuning comfort bands in Settings moves the score too.
 DEFAULT_TARGETS: dict[str, float] = {"co2": 800.0, "pm2_5": 12.0, "voc": 150.0}
-DEFAULT_WEIGHTS: dict[str, float] = {
-    "co2": 0.05,          # per ppm over target
+
+# A weight is either a flat per-unit rate or a list of [from, rate] tiers that
+# steepen as the reading climbs. Tiers are progressive, like tax brackets: each
+# rate applies only to the part of the reading inside its tier.
+#
+# CO₂ is tiered because its bands are not evenly bad. 1,000 ppm is still an
+# acceptable occupied room and should barely dent the score; 2,000 is headaches
+# and fatigue and should gut it. A single rate cannot do both — set it gentle
+# enough for 1,000 and 2,000 barely registers, steep enough for 2,000 and an
+# ordinary occupied bedroom scores as a problem.
+DEFAULT_WEIGHTS: dict[str, float | list] = {
+    "co2": [                  # per ppm, by band
+        [800.0, 0.015],       #   800–1,000  acceptable for an occupied room
+        [1000.0, 0.045],      # 1,000–2,000  stuffy: sleepiness, reduced focus
+        [2000.0, 0.10],       #      >2,000  poor ventilation: headaches, fatigue
+    ],
     "pm2_5": 0.7,         # per µg/m³ over target
     "voc": 0.1,           # per index point over target
     "temperature": 2.0,   # per °F outside the good band, either side
@@ -109,7 +123,7 @@ class ScoreConfig:
         if unknown:
             raise ValueError(f"score: unknown key(s) {', '.join(sorted(unknown))}")
         self.targets = _merge_numeric("score.targets", DEFAULT_TARGETS, raw.get("targets"))
-        self.weights = _merge_numeric("score.weights", DEFAULT_WEIGHTS, raw.get("weights"))
+        self.weights = _merge_weights(DEFAULT_WEIGHTS, raw.get("weights"), self.targets)
         self.bands = _merge_numeric("score.bands", DEFAULT_BANDS, raw.get("bands"))
         self.house = _merge_numeric("score.house", DEFAULT_HOUSE, raw.get("house"))
         if not (self.bands["excellent"] >= self.bands["good"] >= self.bands["fair"]):
@@ -127,6 +141,65 @@ def _merge_numeric(where: str, defaults: dict[str, float], override: dict | None
             raise ValueError(f"{where}.{key}: must be a number")
         merged[key] = float(value)
     return merged
+
+
+def _weight_value(where: str, value) -> float | list[tuple[float, float]]:
+    """One weight: a flat rate, or ascending [from, rate] tiers."""
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        return float(value)
+    if not isinstance(value, list) or not value:
+        raise ValueError(f"{where}: must be a number or a list of [from, rate] tiers")
+    tiers: list[tuple[float, float]] = []
+    for tier in value:
+        if not isinstance(tier, (list, tuple)) or len(tier) != 2:
+            raise ValueError(f"{where}: each tier must be [from, rate]")
+        start, rate = tier
+        for number in (start, rate):
+            if not isinstance(number, (int, float)) or isinstance(number, bool):
+                raise ValueError(f"{where}: tier bounds and rates must be numbers")
+        tiers.append((float(start), float(rate)))
+    if any(b[0] <= a[0] for a, b in zip(tiers, tiers[1:])):
+        raise ValueError(f"{where}: tier bounds must ascend")
+    return tiers
+
+
+def _merge_weights(
+    defaults: dict[str, float | list], override: dict | None, targets: dict[str, float]
+) -> dict[str, float | list[tuple[float, float]]]:
+    merged = {key: _weight_value(f"score.weights.{key}", value) for key, value in defaults.items()}
+    for key, value in (override or {}).items():
+        if key not in defaults:
+            raise ValueError(f"score.weights: unknown key '{key}'")
+        merged[key] = _weight_value(f"score.weights.{key}", value)
+    for key, value in merged.items():
+        if not isinstance(value, list):
+            continue
+        # Tiers replace the flat rate but not the target: the first tier has to
+        # start where penalties start, or the score would dock points for a
+        # reading the advisory is still calling fine.
+        if key not in targets:
+            raise ValueError(f"score.weights.{key}: tiers need a target; {key} scores off a band")
+        if value[0][0] != targets[key]:
+            raise ValueError(
+                f"score.weights.{key}: first tier must start at the {key} target "
+                f"({_fmt(targets[key], 0)}), not {_fmt(value[0][0], 0)}"
+            )
+    return merged
+
+
+def _penalty_above(value: float, target: float, weight: float | list[tuple[float, float]]) -> float:
+    """Points lost by a reading past its target. Tiered weights are progressive
+    — each rate bites only on the part of the reading inside its own tier — so
+    the curve steepens instead of stepping."""
+    if not isinstance(weight, list):
+        return max(0.0, value - target) * weight
+    total = 0.0
+    for i, (start, rate) in enumerate(weight):
+        if value <= start:
+            break
+        ceiling = weight[i + 1][0] if i + 1 < len(weight) else value
+        total += (min(value, ceiling) - start) * rate
+    return total
 
 
 def _fmt(value: float, digits: int) -> str:
@@ -164,10 +237,11 @@ def score_room(
         if window is not None:
             lo, hi = window
             distance = lo - value if value < lo else max(0.0, value - hi)
+            penalty = distance * weight
             detail = f"{_fmt(value, DIGITS[metric])} {UNITS[metric]} vs {_fmt(lo, 0)}–{_fmt(hi, 0)} band"
         else:
             target = cfg.targets[metric]
-            distance = max(0.0, value - target)
+            penalty = _penalty_above(float(value), target, weight)
             unit = f" {UNITS[metric]}" if UNITS[metric] else ""
             detail = f"{_fmt(value, DIGITS[metric])}{unit} vs {_fmt(target, 0)} target"
         parts.append(
@@ -175,7 +249,7 @@ def score_room(
                 metric=metric,
                 label=LABELS[metric],
                 detail=detail,
-                penalty=distance * weight,
+                penalty=penalty,
                 value=float(value),
             )
         )

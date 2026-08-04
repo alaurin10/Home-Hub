@@ -1,6 +1,6 @@
 """Air score: the arithmetic, the bands, and the copy that explains them.
 
-The worked example (CO₂ 1,140 / PM2.5 18 / VOC 210 -> 73) is the one the
+The worked example (CO₂ 1,140 / PM2.5 18 / VOC 210 -> 80) is the one the
 Settings -> Air score tab renders, so it is pinned here: if the score moves, the
 explanation on screen moves with it and this test says so.
 """
@@ -24,13 +24,14 @@ def test_room_at_target_scores_100():
     assert all(p.penalty == 0 for p in parts)
 
 
-def test_worked_example_scores_73():
-    # 1140 ppm -> 17.0 · 18 µg/m³ -> 4.2 · 210 VOC -> 6.0 = 27.2 penalty
+def test_worked_example_scores_80():
+    # 1140 ppm -> 9.3 · 18 µg/m³ -> 4.2 · 210 VOC -> 6.0 = 19.5 penalty
+    # CO₂: 200 ppm in the first tier (3.0) + 140 in the second (6.3).
     metrics = {"co2": 1140, "pm2_5": 18, "voc": 210, "temperature": 73.2, "humidity": 46}
     score, parts = score_room(metrics, THRESHOLDS, CFG)
-    assert score == 73
+    assert score == 80
     by_metric = {p.metric: p for p in parts}
-    assert by_metric["co2"].penalty == pytest.approx(17.0)
+    assert by_metric["co2"].penalty == pytest.approx(9.3)
     assert by_metric["pm2_5"].penalty == pytest.approx(4.2)
     assert by_metric["voc"].penalty == pytest.approx(6.0)
     # The detail strings are what the UI prints — they must name the target.
@@ -136,6 +137,44 @@ def test_no_rooms_reporting():
     assert summary["score"] == 0
 
 
+def test_tiered_weight_stays_gentle_while_the_room_is_acceptable():
+    # 1,000 ppm is still an acceptable occupied room: it should read as
+    # excellent, not sit on the band edge the way a flat rate left it.
+    assert score_room({"co2": 1000}, THRESHOLDS, CFG)[0] == 97
+    assert band_for(score_room({"co2": 1000}, THRESHOLDS, CFG)[0], CFG) == "excellent"
+
+
+def _co2_penalty(ppm: float) -> float:
+    parts = score_room({"co2": ppm}, THRESHOLDS, CFG)[1]
+    return next(p.penalty for p in parts if p.metric == "co2")
+
+
+def test_tiered_weight_steepens_as_the_reading_climbs():
+    # The same 200 ppm costs progressively more the higher up it sits — one
+    # step taken inside each tier. Within a single tier the rate is flat, so
+    # the steps have to be placed in different tiers to show the steepening.
+    acceptable = _co2_penalty(1000) - _co2_penalty(800)
+    stuffy = _co2_penalty(1200) - _co2_penalty(1000)
+    unhealthy = _co2_penalty(2200) - _co2_penalty(2000)
+    assert acceptable < stuffy < unhealthy
+    # 2,000 ppm is headaches and fatigue: it should gut the score on its own.
+    assert band_for(score_room({"co2": 2000}, THRESHOLDS, CFG)[0], CFG) == "poor"
+
+
+def test_tiers_are_progressive_not_stepped():
+    # A rate applies only inside its own tier, so crossing a boundary must not
+    # retroactively reprice the ppm below it — no cliff at the boundary.
+    just_under = score_room({"co2": 1999}, THRESHOLDS, CFG)[0]
+    just_over = score_room({"co2": 2001}, THRESHOLDS, CFG)[0]
+    assert just_under - just_over <= 1
+
+
+def test_flat_weights_still_work():
+    # The tiered shape is opt-in; a plain number keeps the old linear behavior.
+    cfg = ScoreConfig({"weights": {"co2": 0.05}})
+    assert score_room({"co2": 1140}, THRESHOLDS, cfg)[0] == 83  # (1140-800) * 0.05
+
+
 def test_config_block_overrides_defaults():
     cfg = ScoreConfig({"weights": {"co2": 0.1}, "bands": {"good": 80}})
     assert cfg.weights["co2"] == 0.1
@@ -153,6 +192,12 @@ def test_config_block_overrides_defaults():
         {"bands": {"good": 95}},          # good above excellent
         {"house": {"worst_weight": 2}},   # out of range
         {"wieghts": {}},                  # typo'd block
+        {"weights": {"co2": []}},                          # empty tier list
+        {"weights": {"co2": [[800, 0.01], [600, 0.02]]}},   # tiers descend
+        {"weights": {"co2": [[900, 0.01]]}},               # first tier misses target
+        {"weights": {"co2": [[800, 0.01, 2]]}},            # not a [from, rate] pair
+        {"weights": {"co2": [[800, "steep"]]}},            # non-numeric rate
+        {"weights": {"temperature": [[67, 0.5]]}},         # band metric has no target
     ],
 )
 def test_config_block_rejects_nonsense(raw):
