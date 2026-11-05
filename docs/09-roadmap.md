@@ -9,8 +9,8 @@
 > features stay in the §18 backlog of `docs/00-architecture.md`; this doc is
 > the infra side.
 
-**Resource reality check** (`proxmox/README.md`): ~10 GB of 16 GB RAM and
-~76 GB of 128 GB disk are allocated to the three existing guests. Everything
+**Resource reality check** (`proxmox/README.md`): ~8 GB of 16 GB RAM and
+~72 GB of 128 GB disk are allocated to the two existing guests. Everything
 below fits comfortably in the remainder — each LXC needs 256–512 MB RAM and
 2–4 GB disk. Nothing here forces the 500 GB SSD upgrade.
 
@@ -24,23 +24,22 @@ below fits comfortably in the remainder — each LXC needs 256–512 MB RAM and
 > instead, per `docs/10-remote-access.md`. N1–N3 below remain the **LAN-side and
 > admin** story (local names, internal TLS, tailnet reach); they're unchanged.
 
-### N1 — Finish the Pi-hole LXC (already planned; do first)
+### N1 — Local DNS (Pi-hole dropped)
 
-The LXC is designed (`proxmox/README.md`) but not yet live. Nothing else in
-this doc depends on it, but internal hostnames (N2) are much nicer once local
-DNS exists.
+> **Decision (Nov 2026):** the planned Pi-hole LXC was built, then
+> decommissioned — network-wide ad blocking isn't wanted, and a sole-DNS
+> guest was a household-wide single point of failure. The router's own DNS
+> (or a public resolver) is used instead.
 
-- Static IP; router DHCP hands out Pi-hole as DNS.
-- **Local DNS records** for every service: `pve.home.arpa`, `ha.home.arpa`,
-  `kuma.home.arpa`, … — this is what makes N2's reverse proxy usable without
-  memorizing ports.
-- **Sole-DNS risk** (already flagged in `proxmox/README.md`): Pi-hole down =
-  internet "down" for the household. Mitigations, pick one: (a) accept it —
-  it's an LXC on a UPS-backed host, restart is one command; (b) router hands
-  out a public secondary (filtering becomes partial); (c) later, a second
-  tiny DNS LXC. Start with (a), revisit after the first unplanned outage.
-- **DoD:** ads blocked on a phone with no per-device config; `dig ha.home.arpa`
-  resolves; Pi-hole survives a host reboot unattended.
+Internal hostnames (N2) no longer have a DNS server of their own. Options,
+pick one when N2 lands:
+
+- Add `*.home.arpa` A records on the **router** if it supports local DNS
+  records (simplest, no new guest).
+- Or a one-line-per-host `/etc/hosts` / device-level entry for the few
+  machines that matter.
+- Or skip names entirely and keep `ip:port` — the Cloudflare Tunnel
+  (`docs/10-remote-access.md`) already gives public names to the dashboards.
 
 ### N2 — Reverse proxy LXC with internal TLS (Caddy)
 
@@ -53,8 +52,7 @@ Today every service is `ip:port` over plain HTTP. One small LXC running
   everything else. Caddy's `internal` TLS issuer gives padlocked HTTPS on the
   LAN with one line; install its root CA on your devices once (or, if you own
   a real domain, use DNS-01 for a wildcard cert and skip the CA install).
-- Routes: `ha.` → HA VM :8123, `kuma.` → the N3 LXC, `pve.` → :8006,
-  `pihole.` → Pi-hole admin.
+- Routes: `ha.` → HA VM :8123, `kuma.` → the N3 LXC, `pve.` → :8006.
 - HA needs `use_x_forwarded_for` + the proxy's IP in `trusted_proxies`
   (`configuration.yaml` already holds the cloudflared subnet from Phase 7;
   N2 adds this proxy's IP alongside it).
@@ -71,8 +69,8 @@ Kuma, SSH) is reachable remotely — not just HA — while keeping the
 no-inbound-ports rule.
 
 - Tiny LXC, `tailscale up --advertise-routes=192.168.1.0/24`; approve the
-  route in the admin console. Advertise Pi-hole as the tailnet DNS server and
-  `*.home.arpa` names work remotely too.
+  route in the admin console. If the router serves `*.home.arpa`
+  names, advertise it as the tailnet DNS server so they work remotely too.
 - Keep the HA add-on as a fallback path (two doors, one vendor) or drop it
   once the subnet router is proven — decide during Phase 7.
 - **DoD:** on cellular, `https://pve.home.arpa` loads and `ssh pve` works;
@@ -108,7 +106,6 @@ loop (this is the exact fix deferred by audit finding 1).
 | HA `http://<ha>:8123/api/` | HTTP (expect 401) | HA Core down/hung |
 | Mosquitto `<ha>:1883` | TCP | broker down → Zigbee dead |
 | Dashboard app `/api/health` | HTTP | custom dashboard down |
-| Pi-hole | DNS query | DNS down (the "internet is broken" pager) |
 | Proxmox `https://<pve>:8006` | HTTP | host UI/API |
 
 - **Notification channel must not depend on HA**: ntfy.sh (or a self-hosted
@@ -167,17 +164,16 @@ exists (see §18 backlog for details — no new design work needed):
 
 | # | Item | New guest? | RAM | Cost | Prereq |
 |---|---|---|---|---|---|
-| 1 | N1 Pi-hole | LXC (planned) | 512 MB | $0 | Phase 1 host |
-| 2 | M1 Uptime Kuma | LXC | 256–512 MB | $0 | Phase 1 host |
-| 3 | M2 dead-man's switch | no (HA package + backup hook) | — | $0 | HA live (Phase 1) |
-| 4 | N2 Caddy | LXC | 256 MB | $0 | N1 (names) |
-| 5 | N3 Tailscale subnet router | LXC | 256 MB | $0 | — |
-| 6 | M3 System Monitor wiring | no | — | $0 | HA live |
-| 7 | N4 segmentation pass | no | — | $0 | — |
-| 8 | M4 NUT | no | — | UPS (~$55) | UPS purchase |
+| 1 | M1 Uptime Kuma | LXC | 256–512 MB | $0 | Phase 1 host |
+| 2 | M2 dead-man's switch | no (HA package + backup hook) | — | $0 | HA live (Phase 1) |
+| 3 | N2 Caddy | LXC | 256 MB | $0 | — |
+| 4 | N3 Tailscale subnet router | LXC | 256 MB | $0 | — |
+| 5 | M3 System Monitor wiring | no | — | $0 | HA live |
+| 6 | N4 segmentation pass | no | — | $0 | — |
+| 7 | M4 NUT | no | — | UPS (~$55) | UPS purchase |
 
-Worst case adds ~1.5 GB RAM across four LXCs against ~6 GB free. Items 1–3
-deliver the most safety per hour of effort; 4–6 are quality-of-life; 7–8
+Worst case adds ~1 GB RAM across three LXCs against ~8 GB free. Items 1–2
+deliver the most safety per hour of effort; 3–5 are quality-of-life; 6–7
 complete the story.
 
 **Related:** the custom dashboard app (`apps/dashboard/`, July 2026) deploys as

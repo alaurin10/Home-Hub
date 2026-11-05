@@ -1,5 +1,5 @@
 # 02 — Phase 1: Detailed Setup Guide
-## Proxmox + Home Assistant OS + Pi-hole + Docker host + Network + Add-ons + Git
+## Proxmox + Home Assistant OS + Docker host + Network + Add-ons + Git
 
 > See `docs/00-architecture.md` §1, §3, §5 for design rationale.
 > Fill in your exact values (IPs, VLAN IDs, MAC addresses) as you work through this.
@@ -242,18 +242,19 @@ If VT-d shows nothing, reboot into BIOS (**`F10`** on the HP) and enable **VTx +
 
 ---
 
-## C. Create the guests (HA VM + Pi-hole LXC + Docker host VM)
+## C. Create the guests (HA VM + Docker host VM)
 
-> Three guests run on Proxmox. **Home Assistant** is a full VM (it's an appliance);
-> **Pi-hole** is a lightweight LXC; the **Docker host** is a small VM that will later run
-> your containerized apps (garmin-mcp + the Garmin dashboard). Sized to fit the **128 GB
-> SSD** with room for snapshots/backups:
+> Two guests run on Proxmox. **Home Assistant** is a full VM (it's an appliance); the
+> **Docker host** is a small VM that runs your containerized apps (the Home-Hub dashboard,
+> plus garmin-mcp + the Garmin dashboard). Sized to fit the **128 GB SSD** with room for
+> snapshots/backups:
+>
+> *(A Pi-hole LXC was originally the second guest; it was decommissioned in Nov 2026.)*
 
 | Guest | Type | vCPU | RAM | Disk | Created in |
 |---|---|---|---|---|---|
 | Home Assistant OS | VM | 2 | 4 GB | 48 GB | C1–C3 |
-| Pi-hole | LXC | 1 | 512 MB | 4 GB | C4 |
-| Docker host (Debian) | VM | 2 | 4 GB | 24 GB | C5 |
+| Docker host (Debian) | VM | 2 | 4 GB | 24 GB | C4 |
 
 > **Docker runs inside a VM, not an LXC** — Proxmox doesn't support Docker-in-LXC, and
 > nesting weakens isolation + breaks on kernel/systemd updates. A small Debian VM is the
@@ -282,9 +283,9 @@ The script downloads the latest HA OS image and creates the VM automatically.
 
 After the script completes, find the new VM in the sidebar (usually VM ID 100+).
 
-**Set resources to fit the 3-guest budget** (Hardware tab):
+**Set resources to fit the 2-guest budget** (Hardware tab):
 - Processors: 2 (plenty for HA; leaves cores for the other guests — easy to raise later)
-- Memory: 4096 MB (HA is comfortable in 4 GB; the rest is reserved for the Docker VM + Pi-hole)
+- Memory: 4096 MB (HA is comfortable in 4 GB; the rest is reserved for the Docker VM)
 - Hard Disk: 48 GB (select disk → Disk Action → Resize). Thin-provisioned; grow it later if needed.
 
 **Note the VM ID** (you'll need it for USB passthrough in Phase 5).
@@ -309,46 +310,7 @@ Settings → System → General → scroll to "System time" — must show curren
 Settings → System → About → e.g. `Home Assistant 2026.5.3`
 → Update `ha-check.yml` with `2026.5` (the `YYYY.M` part).
 
-### C4. Pi-hole LXC (the second guest)
-
-Pi-hole gives network-wide ad/tracker blocking via DNS. It runs **natively in a tiny Debian
-LXC** — no Docker needed.
-
-**Create it with the community helper script (easiest):**
-1. Proxmox UI → select your node (`pve`) → **Shell**.
-2. Grab the current Pi-hole LXC command from **`https://community-scripts.github.io/ProxmoxVE/`**
-   (search "Pi-hole"), or run:
-   ```bash
-   bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/ct/pihole.sh)"
-   ```
-3. Choose **Default**, or **Advanced** to set: unprivileged LXC, Debian 12,
-   **1 vCPU, 512 MB RAM, 4 GB disk**.
-4. At the end the script prints the **LXC IP** and the **admin URL** — note them.
-
-**Give it a fixed address + set the password:**
-5. Give the LXC a **static IP** (or a DHCP reservation on your router) so it never moves —
-   DNS depends on it.
-6. Set the admin password: select the LXC → **Console** → `pihole setpassword`.
-7. Open `http://<pihole-ip>/admin` → log in.
-
-**Point your network at Pi-hole (so it actually filters):**
-8. On your router, set the **DHCP "DNS server" option to the Pi-hole IP** (covers every
-   device). Apply, then renew a lease / reboot a device to pick it up.
-   - **Reliability note:** Pi-hole as the *only* DNS = full filtering but a dependency — if
-     the LXC is down, DNS stops. It's very stable; keep it running, or add a public secondary
-     DNS and accept that some queries then bypass filtering.
-
-**Verify:**
-9. From a device now using Pi-hole — normal sites resolve, and a known ad domain is blocked:
-   ```bash
-   nslookup doubleclick.net <pihole-ip>     # should return 0.0.0.0 (blocked)
-   ```
-   The admin **Query Log** should show live traffic.
-
-> **Manual alternative:** create a Debian 12 LXC from a template, then run the official
-> installer inside it: `curl -sSL https://install.pi-hole.net | bash`.
-
-### C5. Docker host VM (the third guest)
+### C4. Docker host VM (the second guest)
 
 A small Debian VM running Docker. It stays **empty for now** — later phases `git clone` your
 garmin-mcp and Garmin-dashboard repos here and bring each up with `docker compose`.
@@ -917,16 +879,15 @@ EOF
 
 ## Phase 1 DoD checklist
 
-- [ ] Proxmox web UI accessible at `https://[mini-PC-IP]:8006`; all 3 guests in the tree
+- [ ] Proxmox web UI accessible at `https://[mini-PC-IP]:8006`; both guests in the tree
 - [ ] HA accessible at `http://homeassistant.local:8123` (LAN)
 - [ ] HA accessible via Tailscale on cellular (WiFi off → Tailscale IP works)
 - [ ] Settings → System → About → timezone and clock correct
 - [ ] Settings → System → Database → shows MariaDB (not SQLite)
-- [ ] **Pi-hole LXC** running; `http://<pihole-ip>/admin` loads; a client gets filtered DNS
 - [ ] **Docker host VM** running; `docker run hello-world` succeeds; otherwise empty/ready
 - [ ] `git push` works from HA shell; CI goes green
 - [ ] `secrets.yaml` and `esphome/secrets.yaml` do NOT appear in `git status`
 - [ ] Advanced SSH, Studio Code Server, Tailscale, MariaDB, NUT add-ons installed
-- [ ] Proxmox snapshot taken per guest (`phase1-baseline-ha`, `-pihole`, `-docker`)
+- [ ] Proxmox snapshot taken per guest (`phase1-baseline-ha`, `-docker`)
 - [ ] HA backup `phase1-baseline` downloaded off-server
 - [ ] (Optional) IoT VLAN configured with mDNS reflector
