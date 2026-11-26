@@ -93,7 +93,7 @@ Kitchen gas/PM is ~$21–29 (PMS7003 + SGP41) vs ~$40–50 for a SEN55.
 
 ## Add-ons (free, no hardware cost)
 
-MariaDB, Mosquitto, Node-RED, Pi-hole, Tailscale, cloudflared, ESPHome,
+MariaDB, Mosquitto, Node-RED, Tailscale, cloudflared, ESPHome,
 Advanced SSH, Studio Code Server, NUT, Z2M.
 
 ---

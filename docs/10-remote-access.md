@@ -53,7 +53,7 @@ additional_hosts:
 ```
 
 - `<docker-vm-ip>` is the Docker host VM's LAN IP (or a `.home.arpa` name once
-  `docs/09-roadmap.md` N1/N2 land) — wherever `apps/dashboard/` is actually
+  `docs/09-roadmap.md` N2 lands) — wherever `apps/dashboard/` is actually
   reachable on port 8080.
 - Start the add-on and open its **log**: it prints a Cloudflare login URL.
   Authenticate once → the add-on creates the tunnel (**outbound-only**, no
