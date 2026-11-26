@@ -82,7 +82,6 @@ at once (one radio per protocol).
   ├── VM: Docker host (Debian) ── containerized apps (separate repos; data gitignored):
   │        garmin-mcp (+ future MCP servers) · Garmin insights dashboard
   │        (FastAPI + React + sync job + DB — distinct from the MCP data path)
-  ├── LXC: Pi-hole ── network-wide DNS filtering
   └── (room to grow) Node-RED · a later Frigate NVR — isolated from HA
 ```
 
@@ -142,7 +141,7 @@ critical path.
 | Zigbee motion/contact sensors (optional) | 6 | $8–15 ea | For automations |
 | Off-site backup storage (cloud) | 7 | ~$0–6/mo | Google Drive free tier likely enough |
 
-MariaDB, Node-RED, Pi-hole, etc. are **free add-ons** — no hardware cost.
+MariaDB, Node-RED, etc. are **free add-ons** — no hardware cost.
 **First cart (Phases 1–2): ~$260–420.** Add the Zigbee kit at Phase 5.
 
 ---
