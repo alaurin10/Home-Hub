@@ -1,15 +1,15 @@
 # Proxmox host — notes (no secrets)
 
 The mini PC (**HP EliteDesk 600 G3 Mini** · i5-7500T · 16 GB · 128 GB SSD) runs
-**Proxmox VE**. Two guests run on it. See `docs/00-architecture.md` §1 and §3 for
+**Proxmox VE**. Two guests run on it, both VMs. See `docs/00-architecture.md` §1 and §3 for
 rationale, and the step-by-step build in `docs/02-bootstrap-proxmox-haos.md` §C.
 
 ## Guest topology
 
 ```
 Proxmox host
-├── VM:  Home Assistant OS    ← the appliance (Supervisor / add-ons)
-└── VM:  Docker host (Debian) ← Home-Hub dashboard, garmin-mcp + Garmin dashboard (separate compose stacks)
+├── VM: Home Assistant OS    ← the appliance (Supervisor / add-ons)
+└── VM: Docker host (Debian) ← Home-Hub dashboard, garmin-mcp + Garmin dashboard (separate compose stacks)
 ```
 
 | Guest | Type | vCPU | RAM | Disk | Notes |
@@ -44,6 +44,13 @@ If a disk-hungry service (e.g. a Frigate NVR) is added, revisit a 500 GB SSD upg
   entity registry and CI) — the VM clones/pulls home-hub and runs `docker compose up -d` there.
 - Give it a **static IP**. The garmin-mcp is reached via the existing **Cloudflare Tunnel**
   (a `cloudflared` container/route points here) — no inbound ports opened.
+
+## DNS (no Pi-hole)
+
+- The Pi-hole LXC was **removed (Nov 2026)** — the owner decided they didn't want
+  network-wide DNS filtering. The LAN uses the **router's DNS**; there is no DNS guest on
+  this host. Any local names (`*.home.arpa`) come from the router's static/local DNS entries
+  or `/etc/hosts` — see `docs/09-roadmap.md` N2.
 
 ## USB passthrough (the ZBT-2 Zigbee coordinator) — Phase 5
 

@@ -244,17 +244,18 @@ If VT-d shows nothing, reboot into BIOS (**`F10`** on the HP) and enable **VTx +
 
 ## C. Create the guests (HA VM + Docker host VM)
 
-> Two guests run on Proxmox. **Home Assistant** is a full VM (it's an appliance); the
-> **Docker host** is a small VM that runs your containerized apps (the Home-Hub dashboard,
-> plus garmin-mcp + the Garmin dashboard). Sized to fit the **128 GB SSD** with room for
+> Two guests run on Proxmox, both VMs. **Home Assistant** is a full VM (it's an appliance);
+> the **Docker host** is a small VM that runs your containerized apps (the Home-Hub
+> dashboard, plus garmin-mcp + the Garmin dashboard). Sized to fit the **128 GB SSD** with room for
 > snapshots/backups:
->
-> *(A Pi-hole LXC was originally the second guest; it was decommissioned in Nov 2026.)*
 
 | Guest | Type | vCPU | RAM | Disk | Created in |
 |---|---|---|---|---|---|
 | Home Assistant OS | VM | 2 | 4 GB | 48 GB | C1–C3 |
 | Docker host (Debian) | VM | 2 | 4 GB | 24 GB | C4 |
+
+> **No DNS guest.** A Pi-hole LXC was originally planned here; it was removed (Nov 2026)
+> because the owner decided they didn't want it. The LAN keeps using the router's DNS.
 
 > **Docker runs inside a VM, not an LXC** — Proxmox doesn't support Docker-in-LXC, and
 > nesting weakens isolation + breaks on kernel/systemd updates. A small Debian VM is the
@@ -284,8 +285,8 @@ The script downloads the latest HA OS image and creates the VM automatically.
 After the script completes, find the new VM in the sidebar (usually VM ID 100+).
 
 **Set resources to fit the 2-guest budget** (Hardware tab):
-- Processors: 2 (plenty for HA; leaves cores for the other guests — easy to raise later)
-- Memory: 4096 MB (HA is comfortable in 4 GB; the rest is reserved for the Docker VM)
+- Processors: 2 (plenty for HA; leaves cores for the Docker VM — easy to raise later)
+- Memory: 4096 MB (HA is comfortable in 4 GB; the rest is reserved for the Docker VM + headroom)
 - Hard Disk: 48 GB (select disk → Disk Action → Resize). Thin-provisioned; grow it later if needed.
 
 **Note the VM ID** (you'll need it for USB passthrough in Phase 5).
@@ -879,7 +880,7 @@ EOF
 
 ## Phase 1 DoD checklist
 
-- [ ] Proxmox web UI accessible at `https://[mini-PC-IP]:8006`; both guests in the tree
+- [ ] Proxmox web UI accessible at `https://[mini-PC-IP]:8006`; both guests (HA VM + Docker VM) in the tree
 - [ ] HA accessible at `http://homeassistant.local:8123` (LAN)
 - [ ] HA accessible via Tailscale on cellular (WiFi off → Tailscale IP works)
 - [ ] Settings → System → About → timezone and clock correct

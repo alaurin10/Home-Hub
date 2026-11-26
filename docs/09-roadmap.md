@@ -10,7 +10,7 @@
 > the infra side.
 
 **Resource reality check** (`proxmox/README.md`): ~8 GB of 16 GB RAM and
-~72 GB of 128 GB disk are allocated to the two existing guests. Everything
+~72 GB of 128 GB disk are allocated to the two existing VMs. Everything
 below fits comfortably in the remainder — each LXC needs 256–512 MB RAM and
 2–4 GB disk. Nothing here forces the 500 GB SSD upgrade.
 
@@ -21,25 +21,14 @@ below fits comfortably in the remainder — each LXC needs 256–512 MB RAM and
 > **Pulled forward (July 2026):** remote *browser* access to the dashboards no
 > longer waits on anything in this section — the **Cloudflare Tunnel + Access**
 > milestone (docs/00 §10, Phase 7) ships alongside the custom dashboard app
-> instead, per `docs/10-remote-access.md`. N1–N3 below remain the **LAN-side and
-> admin** story (local names, internal TLS, tailnet reach); they're unchanged.
+> instead, per `docs/10-remote-access.md`. N2–N3 below remain the **LAN-side and
+> admin** story (local names, internal TLS, tailnet reach); N1 was dropped.
 
-### N1 — Local DNS (Pi-hole dropped)
+### N1 — Pi-hole LXC — **dropped (Nov 2026)**
 
-> **Decision (Nov 2026):** the planned Pi-hole LXC was built, then
-> decommissioned — network-wide ad blocking isn't wanted, and a sole-DNS
-> guest was a household-wide single point of failure. The router's own DNS
-> (or a public resolver) is used instead.
-
-Internal hostnames (N2) no longer have a DNS server of their own. Options,
-pick one when N2 lands:
-
-- Add `*.home.arpa` A records on the **router** if it supports local DNS
-  records (simplest, no new guest).
-- Or a one-line-per-host `/etc/hosts` / device-level entry for the few
-  machines that matter.
-- Or skip names entirely and keep `ip:port` — the Cloudflare Tunnel
-  (`docs/10-remote-access.md`) already gives public names to the dashboards.
+The Pi-hole LXC was removed from the host — the owner decided they didn't want
+network-wide DNS filtering; the LAN stays on the router's DNS, and local names move
+into N2.
 
 ### N2 — Reverse proxy LXC with internal TLS (Caddy)
 
@@ -52,12 +41,25 @@ Today every service is `ip:port` over plain HTTP. One small LXC running
   everything else. Caddy's `internal` TLS issuer gives padlocked HTTPS on the
   LAN with one line; install its root CA on your devices once (or, if you own
   a real domain, use DNS-01 for a wildcard cert and skip the CA install).
-- Routes: `ha.` → HA VM :8123, `kuma.` → the N3 LXC, `pve.` → :8006.
+- Routes: `ha.` → HA VM :8123, `kuma.` → the M1 LXC, `pve.` → :8006,
+  `dash.` → Docker VM :8080.
+- **Local names, without a DNS server of our own:** every `<name>.home.arpa`
+  resolves to the **Caddy LXC's IP** (Caddy routes by hostname), so only a
+  handful of records are needed. Preferred: the **router's local/static DNS
+  entries** (most routers expose this as "local DNS", "static DNS" or
+  dnsmasq host records; some also register DHCP-reservation hostnames).
+  Fallback if the router can't: **`/etc/hosts` entries** on the few admin
+  devices that need the names (phones then use IPs or Tailscale names).
+  Give Caddy a **static IP / DHCP reservation** so the records never go stale.
+  Or skip local names entirely and keep `ip:port` — the Cloudflare Tunnel
+  (`docs/10-remote-access.md`) already gives the dashboards public names.
 - HA needs `use_x_forwarded_for` + the proxy's IP in `trusted_proxies`
   (`configuration.yaml` already holds the cloudflared subnet from Phase 7;
   N2 adds this proxy's IP alongside it).
 - **DoD:** every service reachable at `https://<name>.home.arpa` with no
-  browser warning; committed Caddyfile is the only route config.
+  browser warning; `dig ha.home.arpa @<router-ip>` (or `getent hosts
+  ha.home.arpa` on a hosts-file device) returns the Caddy IP; committed
+  Caddyfile is the only route config.
 
 ### N3 — Tailscale subnet router (remote access, still zero inbound ports)
 
@@ -69,11 +71,15 @@ Kuma, SSH) is reachable remotely — not just HA — while keeping the
 no-inbound-ports rule.
 
 - Tiny LXC, `tailscale up --advertise-routes=192.168.1.0/24`; approve the
-  route in the admin console. If the router serves `*.home.arpa`
-  names, advertise it as the tailnet DNS server so they work remotely too.
+  route in the admin console. For remote names, add a **split-DNS nameserver**
+  in the Tailscale admin console: domain `home.arpa` → the **router's LAN IP**
+  (reachable through the advertised route), so `*.home.arpa` works remotely
+  too. This needs the router-DNS path from N2; with the hosts-file fallback,
+  remote clients use Tailscale MagicDNS names or LAN IPs instead.
 - Keep the HA add-on as a fallback path (two doors, one vendor) or drop it
   once the subnet router is proven — decide during Phase 7.
-- **DoD:** on cellular, `https://pve.home.arpa` loads and `ssh pve` works;
+- **DoD:** on cellular, `https://pve.home.arpa` loads (router-DNS path) or
+  `https://<pve-ip>:8006` loads (hosts-file path), and `ssh pve` works;
   no port-forwards exist on the router.
 
 ### N4 — Segmentation, apartment-scaled (honesty item)
@@ -106,6 +112,7 @@ loop (this is the exact fix deferred by audit finding 1).
 | HA `http://<ha>:8123/api/` | HTTP (expect 401) | HA Core down/hung |
 | Mosquitto `<ha>:1883` | TCP | broker down → Zigbee dead |
 | Dashboard app `/api/health` | HTTP | custom dashboard down |
+| Router DNS (`ha.home.arpa` @ router) | DNS query | router DNS hung, or N2 local records lost (names stop resolving) |
 | Proxmox `https://<pve>:8006` | HTTP | host UI/API |
 
 - **Notification channel must not depend on HA**: ntfy.sh (or a self-hosted
@@ -166,15 +173,15 @@ exists (see §18 backlog for details — no new design work needed):
 |---|---|---|---|---|---|
 | 1 | M1 Uptime Kuma | LXC | 256–512 MB | $0 | Phase 1 host |
 | 2 | M2 dead-man's switch | no (HA package + backup hook) | — | $0 | HA live (Phase 1) |
-| 3 | N2 Caddy | LXC | 256 MB | $0 | — |
-| 4 | N3 Tailscale subnet router | LXC | 256 MB | $0 | — |
+| 3 | N2 Caddy | LXC | 256 MB | $0 | router local DNS (or hosts entries) |
+| 4 | N3 Tailscale subnet router | LXC | 256 MB | $0 | — (remote names need N2's router-DNS path) |
 | 5 | M3 System Monitor wiring | no | — | $0 | HA live |
 | 6 | N4 segmentation pass | no | — | $0 | — |
 | 7 | M4 NUT | no | — | UPS (~$55) | UPS purchase |
 
-Worst case adds ~1 GB RAM across three LXCs against ~8 GB free. Items 1–2
-deliver the most safety per hour of effort; 3–5 are quality-of-life; 6–7
-complete the story.
+(N1 is dropped — see above.) Worst case adds ~1 GB RAM across three LXCs
+against ~8 GB free. Items 1–2 deliver the most safety per hour of effort;
+3–5 are quality-of-life; 6–7 complete the story.
 
 **Related:** the custom dashboard app (`apps/dashboard/`, July 2026) deploys as
 a compose stack when the Docker host VM lands — it's a `ha.`/`dash.` hostname
