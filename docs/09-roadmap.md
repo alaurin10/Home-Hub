@@ -51,6 +51,8 @@ Today every service is `ip:port` over plain HTTP. One small LXC running
   Fallback if the router can't: **`/etc/hosts` entries** on the few admin
   devices that need the names (phones then use IPs or Tailscale names).
   Give Caddy a **static IP / DHCP reservation** so the records never go stale.
+  Or skip local names entirely and keep `ip:port` — the Cloudflare Tunnel
+  (`docs/10-remote-access.md`) already gives the dashboards public names.
 - HA needs `use_x_forwarded_for` + the proxy's IP in `trusted_proxies`
   (`configuration.yaml` already holds the cloudflared subnet from Phase 7;
   N2 adds this proxy's IP alongside it).

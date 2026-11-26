@@ -245,8 +245,8 @@ If VT-d shows nothing, reboot into BIOS (**`F10`** on the HP) and enable **VTx +
 ## C. Create the guests (HA VM + Docker host VM)
 
 > Two guests run on Proxmox, both VMs. **Home Assistant** is a full VM (it's an appliance);
-> the **Docker host** is a small VM that will later run your containerized apps
-> (garmin-mcp + the Garmin dashboard). Sized to fit the **128 GB SSD** with room for
+> the **Docker host** is a small VM that runs your containerized apps (the Home-Hub
+> dashboard, plus garmin-mcp + the Garmin dashboard). Sized to fit the **128 GB SSD** with room for
 > snapshots/backups:
 
 | Guest | Type | vCPU | RAM | Disk | Created in |

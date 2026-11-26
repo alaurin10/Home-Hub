@@ -9,7 +9,7 @@ rationale, and the step-by-step build in `docs/02-bootstrap-proxmox-haos.md` §C
 ```
 Proxmox host
 ├── VM: Home Assistant OS    ← the appliance (Supervisor / add-ons)
-└── VM: Docker host (Debian) ← garmin-mcp + Garmin dashboard (separate compose stacks)
+└── VM: Docker host (Debian) ← Home-Hub dashboard, garmin-mcp + Garmin dashboard (separate compose stacks)
 ```
 
 | Guest | Type | vCPU | RAM | Disk | Notes |
