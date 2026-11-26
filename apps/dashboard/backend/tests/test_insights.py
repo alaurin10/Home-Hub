@@ -25,6 +25,7 @@ from app.insights import (
     Ctx,
     Point,
     evaluate,
+    hour_of,
     mean_between,
     peak,
     rule_band_occupancy,
@@ -72,12 +73,15 @@ def series(values: list[float], hours: float = 24.0, end: float | None = None) -
 
 def diurnal(offset: float = 0.0, solar: float = 0.0, n: int = 144) -> list[Point]:
     """A day of temperature: shared diurnal shape, a per-room constant offset,
-    and optionally a midday solar bump."""
+    and optionally a midday solar bump.
+
+    Hour-of-day comes from the app's own ``hour_of`` (host local time), so the
+    synthetic 2 PM bump lands in the rule's 12:00–16:00 window in any TZ."""
     end = time.time()
     points = []
     for i in range(n):
         t = end - (n - 1 - i) * (24 * 3600 / (n - 1))
-        hod = (t % 86400) / 3600.0
+        hod = hour_of(t)
         value = 70.0 + offset + 2.0 * math.sin(2 * math.pi * (hod - 9) / 24.0)
         if solar:
             value += solar * math.exp(-0.5 * ((hod - 14.0) / 1.6) ** 2)
